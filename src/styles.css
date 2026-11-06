@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@source "./**/*.{ts,tsx}";
+@source "../spa/**/*.{ts,tsx,html}";
 
 @theme {
   --color-bg: #0b0b0d;
