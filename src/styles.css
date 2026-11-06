@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0b0b0d;
+  --color-surface: #161618;
+  --color-raised: #1e1e20;
+  --color-chip: #2a2a2e;
+  --color-fg: #f4f1ea;
+  --color-muted: #8b8b92;
+  --color-line: #2c2c30;
+  --color-pink: #e58aae;
+  --color-blue: #4aa3e8;
+  --color-green: #5dce8a;
+  --color-cream: #ece8df;
+  --color-cream-fg: #161616;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
+  --font-sans: "SF Pro Display", "Inter", system-ui, sans-serif;
+}
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  html,
+  body,
+  #app {
+    background: var(--color-bg);
+    color: var(--color-fg);
+    min-height: 100%;
+  }
+}
+
+@keyframes run-glow {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+.task-glow {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+}
+
+.task-glow::before {
+  content: "";
+  position: absolute;
+  inset: -55%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0 58%,
+    var(--glow-color) 72%,
+    transparent 86%
+  );
+  animation: run-glow 1.8s linear infinite;
+}
+
+.task-glow-inner {
+  position: relative;
+  margin: 2px;
+  border-radius: 0.9rem;
+  background: var(--color-raised);
+  padding: 0.75rem 1rem;
+}
+
+@keyframes soft-green {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(93 206 138 / 0);
+    background-color: rgb(93 206 138 / 0.08);
+  }
+  50% {
+    box-shadow: 0 0 22px 1px rgb(93 206 138 / 0.45);
+    background-color: rgb(93 206 138 / 0.16);
+  }
+}
+
+@keyframes day-green {
+  0%,
+  100% {
+    background-color: rgb(93 206 138 / 0.18);
+    box-shadow: 0 0 0 0 rgb(93 206 138 / 0);
+    color: var(--color-fg);
+  }
+  50% {
+    background-color: rgb(93 206 138 / 0.72);
+    box-shadow: 0 0 16px 2px rgb(93 206 138 / 0.55);
+    color: #06210f;
+  }
+}
+
+.task-done-pulse {
+  border-radius: 1rem;
+  animation: soft-green 1.8s ease-in-out infinite;
+}
+
+.day-done-pulse {
+  animation: day-green 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-glow::before,
+  .task-done-pulse,
+  .day-done-pulse {
+    animation: none;
+  }
+}
