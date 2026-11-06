@@ -1,0 +1,14 @@
+node_modules
+.tanstack
+.vercel
+.output
+dist
+.env
+.env.local
+.node_modules.lock
+attachments
+screenshots
+.grok
+.project_id
+*.log
+.DS_Store
