@@ -80,12 +80,48 @@ export type CheckList = {
   items: ListItem[];
 };
 
+export type VoteOption = { id: string; text: string };
+
+export type VotePoll = {
+  id: string;
+  question: string;
+  options: VoteOption[];
+  createdAt: string;
+  createdBy: "me" | "partner";
+  myChoice?: string;
+  partnerChoice?: string;
+};
+
+export type Capsule = {
+  id: string;
+  title: string;
+  body: string;
+  to: "partner" | "me";
+  opensAt: string;
+  createdAt: string;
+  author: "me" | "partner";
+};
+
+export type QuizState = {
+  index: number;
+  myAnswers: number[];
+  partnerAnswers: number[];
+  myDoneAt?: string;
+  partnerDoneAt?: string;
+  remindedAt?: string;
+  consented: boolean;
+};
+
 type CoupleState = {
   pairCode: string | null;
   waiting: boolean;
   joined: boolean;
   myName: string;
   partnerName: string;
+  myBirthday: string;
+  partnerBirthday: string;
+  myBirthdayEdits: number;
+  partnerBirthdayEdits: number;
   tab: TabId;
   moreOpen: string | null;
   tasks: Task[];
@@ -95,12 +131,18 @@ type CoupleState = {
   lists: CheckList[];
   notes: Note[];
   noteFolders: NoteFolder[];
+  votes: VotePoll[];
+  capsules: Capsule[];
+  anniversaryDate: string;
+  quiz: QuizState;
   openTaskId: string | null;
   taskReturn: TabId | null;
   createPair: () => void;
   joinPair: (code: string) => boolean;
   partnerArrived: () => void;
   leavePair: () => void;
+  setMyBirthday: (iso: string) => boolean;
+  setPartnerBirthday: (iso: string) => boolean;
   setTab: (tab: TabId) => void;
   setMore: (id: string | null) => void;
   addTask: (input: Omit<Task, "id" | "done" | "createdAt" | "assignedBy">) => void;
@@ -125,6 +167,13 @@ type CoupleState = {
   updateNote: (id: string, input: Partial<Note>) => void;
   deleteNote: (id: string) => void;
   addNoteFolder: (title: string, color: string) => string;
+  addVote: (question: string, options: string[]) => void;
+  castVote: (id: string, optionId: string, who?: "me" | "partner") => void;
+  deleteVote: (id: string) => void;
+  addCapsule: (input: { title: string; body: string; opensAt: string; to: "partner" | "me" }) => void;
+  deleteCapsule: (id: string) => void;
+  setQuiz: (patch: Partial<QuizState>) => void;
+  resetQuiz: () => void;
   openTask: (id: string | null, from?: TabId) => void;
 };
 
@@ -141,6 +190,10 @@ export const useCouple = create<CoupleState>()(
       joined: false,
       myName: "Кристианс",
       partnerName: "Алиночка",
+      myBirthday: "",
+      partnerBirthday: "2000-03-29",
+      myBirthdayEdits: 0,
+      partnerBirthdayEdits: 0,
       tab: "tasks",
       moreOpen: null,
       tasks: [],
@@ -150,6 +203,10 @@ export const useCouple = create<CoupleState>()(
       lists: [],
       notes: [],
       noteFolders: [],
+      votes: [],
+      capsules: [],
+      anniversaryDate: "2024-03-24",
+      quiz: { index: 0, myAnswers: [], partnerAnswers: [], consented: false },
       openTaskId: null,
       taskReturn: null,
       createPair: () => set({ pairCode: code(), waiting: true, joined: false }),
@@ -177,6 +234,30 @@ export const useCouple = create<CoupleState>()(
           openTaskId: null,
           taskReturn: null,
         }),
+      setMyBirthday: (iso) => {
+        const value = iso.trim();
+        if (!value) return false;
+        const edits = get().myBirthdayEdits;
+        const current = get().myBirthday;
+        if (current && edits >= 1) return false;
+        set({
+          myBirthday: value,
+          myBirthdayEdits: current ? edits + 1 : edits,
+        });
+        return true;
+      },
+      setPartnerBirthday: (iso) => {
+        const value = iso.trim();
+        if (!value) return false;
+        const edits = get().partnerBirthdayEdits;
+        const current = get().partnerBirthday;
+        if (current && edits >= 1) return false;
+        set({
+          partnerBirthday: value,
+          partnerBirthdayEdits: current ? edits + 1 : edits,
+        });
+        return true;
+      },
       setTab: (tab) => set({ tab, moreOpen: null }),
       setMore: (id) => set({ moreOpen: id }),
       addTask: (input) =>
@@ -362,6 +443,54 @@ export const useCouple = create<CoupleState>()(
         });
         return id;
       },
+      addVote: (question, options) =>
+        set({
+          votes: [
+            {
+              id: crypto.randomUUID(),
+              question: question.trim(),
+              options: options
+                .map((text) => text.trim())
+                .filter(Boolean)
+                .map((text) => ({ id: crypto.randomUUID(), text })),
+              createdAt: new Date().toISOString(),
+              createdBy: "me",
+            },
+            ...get().votes,
+          ],
+        }),
+      castVote: (id, optionId, who = "me") =>
+        set({
+          votes: get().votes.map((v) =>
+            v.id !== id
+              ? v
+              : who === "partner"
+                ? { ...v, partnerChoice: optionId }
+                : { ...v, myChoice: optionId },
+          ),
+        }),
+      deleteVote: (id) => set({ votes: get().votes.filter((v) => v.id !== id) }),
+      addCapsule: (input) =>
+        set({
+          capsules: [
+            {
+              id: crypto.randomUUID(),
+              title: input.title.trim(),
+              body: input.body.trim(),
+              to: input.to,
+              opensAt: input.opensAt,
+              createdAt: new Date().toISOString(),
+              author: "me",
+            },
+            ...get().capsules,
+          ],
+        }),
+      deleteCapsule: (id) => set({ capsules: get().capsules.filter((c) => c.id !== id) }),
+      setQuiz: (patch) => set({ quiz: { ...get().quiz, ...patch } }),
+      resetQuiz: () =>
+        set({
+          quiz: { index: 0, myAnswers: [], partnerAnswers: [], consented: false },
+        }),
       openTask: (id, from) => {
         if (id) {
           set({ openTaskId: id, taskReturn: from ?? get().tab });
@@ -386,6 +515,9 @@ export const useCouple = create<CoupleState>()(
           ...raw,
           notes,
           noteFolders: raw.noteFolders ?? [],
+          votes: raw.votes ?? [],
+          capsules: raw.capsules ?? [],
+          quiz: raw.quiz ?? { index: 0, myAnswers: [], partnerAnswers: [], consented: false },
         };
       },
     },

@@ -91,6 +91,9 @@ export function EmptyState({
 export function TabBar() {
   const tab = useCouple((s) => s.tab);
   const setTab = useCouple((s) => s.setTab);
+  const moreOpen = useCouple((s) => s.moreOpen);
+  const openTaskId = useCouple((s) => s.openTaskId);
+  if (moreOpen || openTaskId) return null;
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
       <div className="mx-auto grid max-w-md grid-cols-5 px-2 pt-2 pb-3">

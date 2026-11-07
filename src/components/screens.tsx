@@ -37,6 +37,10 @@ import {
 } from "lucide-react";
 import { NewListSheet } from "@/components/new-list-sheet";
 import { NotesScreen } from "@/components/notes-screen";
+import { GiftRadarScreen } from "@/components/gift-radar-screen";
+import { VotingScreen } from "@/components/voting-screen";
+import { CapsuleScreen } from "@/components/capsule-screen";
+import { CompatibilityScreen } from "@/components/compatibility-screen";
 import { NewTaskSheet } from "@/components/new-task-sheet";
 import { NewWishSheet } from "@/components/new-wish-sheet";
 import { EmptyState, ScreenHeader, UsBadge } from "@/components/ui/shell";
@@ -1469,33 +1473,29 @@ const MORE = [
 export function MoreScreen() {
   const setMore = useCouple((s) => s.setMore);
   const moreOpen = useCouple((s) => s.moreOpen);
-  const pairCode = useCouple((s) => s.pairCode);
-  const leavePair = useCouple((s) => s.leavePair);
 
   if (moreOpen === "notes") {
     return <NotesScreen onBack={() => setMore(null)} />;
   }
 
+  if (moreOpen === "radar") {
+    return <GiftRadarScreen onBack={() => setMore(null)} />;
+  }
+
+  if (moreOpen === "vote") {
+    return <VotingScreen onBack={() => setMore(null)} />;
+  }
+
+  if (moreOpen === "capsule") {
+    return <CapsuleScreen onBack={() => setMore(null)} />;
+  }
+
+  if (moreOpen === "test") {
+    return <CompatibilityScreen onBack={() => setMore(null)} />;
+  }
+
   if (moreOpen === "settings") {
-    return (
-      <section className="px-5 pt-6">
-        <button type="button" onClick={() => setMore(null)} className="text-muted">
-          Назад
-        </button>
-        <h1 className="mt-4 text-[32px] font-semibold">Настройки</h1>
-        <div className="mt-6 rounded-2xl bg-raised p-5">
-          <p className="text-sm text-muted">Код пары</p>
-          <p className="mt-2 text-3xl font-bold tracking-[0.2em] text-pink">{pairCode}</p>
-        </div>
-        <button
-          type="button"
-          onClick={leavePair}
-          className="mt-6 w-full rounded-2xl bg-raised py-4 text-muted"
-        >
-          Выйти из пары
-        </button>
-      </section>
-    );
+    return <BirthdaySettings onBack={() => setMore(null)} />;
   }
 
   if (moreOpen) {
@@ -1547,5 +1547,102 @@ export function MoreScreen() {
         </div>
       </button>
     </section>
+  );
+}
+
+function BirthdaySettings({ onBack }: { onBack: () => void }) {
+  const pairCode = useCouple((s) => s.pairCode);
+  const leavePair = useCouple((s) => s.leavePair);
+  const myBirthday = useCouple((s) => s.myBirthday);
+  const partnerBirthday = useCouple((s) => s.partnerBirthday);
+  const myBirthdayEdits = useCouple((s) => s.myBirthdayEdits);
+  const partnerBirthdayEdits = useCouple((s) => s.partnerBirthdayEdits);
+  const setMyBirthday = useCouple((s) => s.setMyBirthday);
+  const setPartnerBirthday = useCouple((s) => s.setPartnerBirthday);
+  const myLocked = Boolean(myBirthday) && myBirthdayEdits >= 1;
+  const partnerLocked = Boolean(partnerBirthday) && partnerBirthdayEdits >= 1;
+
+  return (
+    <section className="px-5 pt-6 pb-28">
+      <button type="button" onClick={onBack} className="text-muted">
+        ‹ Ещё
+      </button>
+      <h1 className="mt-4 text-[32px] font-semibold">Настройки</h1>
+      <div className="mt-6 rounded-2xl bg-raised p-5">
+        <p className="text-sm text-muted">Код пары</p>
+        <p className="mt-2 text-3xl font-bold tracking-[0.2em] text-pink">{pairCode}</p>
+      </div>
+      <BirthdayField
+        label="Мой день рождения"
+        value={myBirthday}
+        locked={myLocked}
+        hint={
+          myLocked
+            ? "Дату уже меняли один раз — больше нельзя"
+            : myBirthday
+              ? "Можно поменять ещё один раз"
+              : "Укажи при регистрации. Позже подтянем из Google."
+        }
+        onSave={setMyBirthday}
+      />
+      <BirthdayField
+        label="День рождения партнёра"
+        value={partnerBirthday}
+        locked={partnerLocked}
+        hint={
+          partnerLocked
+            ? "Дату уже меняли один раз — больше нельзя"
+            : "Пока вручную. Потом возьмём из профиля партнёра."
+        }
+        onSave={setPartnerBirthday}
+      />
+      <button
+        type="button"
+        onClick={leavePair}
+        className="mt-6 w-full rounded-2xl bg-raised py-4 text-muted"
+      >
+        Выйти из пары
+      </button>
+    </section>
+  );
+}
+
+function BirthdayField({
+  label,
+  value,
+  locked,
+  hint,
+  onSave,
+}: {
+  label: string;
+  value: string;
+  locked: boolean;
+  hint: string;
+  onSave: (iso: string) => boolean;
+}) {
+  const [draft, setDraft] = useState(value);
+  const [msg, setMsg] = useState("");
+  return (
+    <div className="mt-4 rounded-2xl bg-raised p-5">
+      <p className="text-sm text-muted">{label}</p>
+      <input
+        type="date"
+        value={draft}
+        disabled={locked}
+        onChange={(e) => setDraft(e.target.value)}
+        className="mt-3 w-full rounded-xl bg-chip px-3 py-3 outline-none disabled:opacity-50"
+      />
+      <p className="mt-2 text-sm text-muted">{hint}</p>
+      {locked ? null : (
+        <button
+          type="button"
+          onClick={() => setMsg(onSave(draft) ? "Сохранено" : "Нельзя изменить")}
+          className="mt-3 w-full rounded-xl bg-chip py-3 font-medium"
+        >
+          Сохранить дату
+        </button>
+      )}
+      {msg ? <p className="mt-2 text-sm text-green">{msg}</p> : null}
+    </div>
   );
 }

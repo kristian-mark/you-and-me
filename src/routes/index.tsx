@@ -23,17 +23,37 @@ function Home() {
 function GateScreen() {
   const createPair = useCouple((s) => s.createPair);
   const joinPair = useCouple((s) => s.joinPair);
+  const setMyBirthday = useCouple((s) => s.setMyBirthday);
   const [code, setCode] = useState("");
+  const [birthday, setBirthday] = useState("");
   const [error, setError] = useState("");
+
+  const start = (action: () => boolean | void) => {
+    if (!birthday) {
+      setError("Сначала укажи день рождения");
+      return;
+    }
+    setMyBirthday(birthday);
+    setError("");
+    action();
+  };
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col px-6 pt-16">
       <h1 className="text-[34px] font-semibold tracking-tight">Мы</h1>
       <p className="mt-1 text-muted">только двое</p>
+      <label className="mt-10 text-sm text-muted">День рождения</label>
+      <input
+        type="date"
+        value={birthday}
+        onChange={(e) => setBirthday(e.target.value)}
+        className="mt-2 rounded-2xl bg-raised px-4 py-4 outline-none"
+      />
+      <p className="mt-2 text-sm text-muted">Потом можно взять из Google. Вручную дату получится поменять только один раз.</p>
       <button
         type="button"
-        onClick={createPair}
-        className="mt-10 rounded-2xl bg-pink py-4 text-[17px] font-semibold text-bg"
+        onClick={() => start(() => createPair())}
+        className="mt-6 rounded-2xl bg-pink py-4 text-[17px] font-semibold text-bg"
       >
         Создать пару
       </button>
@@ -45,7 +65,11 @@ function GateScreen() {
       />
       <button
         type="button"
-        onClick={() => setError(joinPair(code) ? "" : "Код не найден")}
+        onClick={() =>
+          start(() => {
+            if (!joinPair(code)) setError("Код не найден");
+          })
+        }
         className="mt-3 rounded-2xl bg-raised py-4 text-[17px] font-semibold"
       >
         Войти по коду
