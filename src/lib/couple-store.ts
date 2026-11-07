@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { pickQuestion, questionById } from "@/lib/daily-questions";
 
 export type TabId = "tasks" | "calendar" | "wishes" | "lists" | "more";
 export type WishOwner = "me" | "partner" | "all";
@@ -112,6 +113,28 @@ export type QuizState = {
   consented: boolean;
 };
 
+export type DailyEntry = {
+  date: string;
+  questionId: string;
+  topic: string;
+  text: string;
+  myAnswer?: string;
+  myAt?: string;
+  partnerAnswer?: string;
+  partnerAt?: string;
+};
+
+export type DailyState = {
+  date: string;
+  questionId: string;
+  myAnswer?: string;
+  myAt?: string;
+  partnerAnswer?: string;
+  partnerAt?: string;
+  skippedIds: string[];
+  history: DailyEntry[];
+};
+
 type CoupleState = {
   pairCode: string | null;
   waiting: boolean;
@@ -135,6 +158,7 @@ type CoupleState = {
   capsules: Capsule[];
   anniversaryDate: string;
   quiz: QuizState;
+  daily: DailyState;
   openTaskId: string | null;
   taskReturn: TabId | null;
   createPair: () => void;
@@ -174,6 +198,9 @@ type CoupleState = {
   deleteCapsule: (id: string) => void;
   setQuiz: (patch: Partial<QuizState>) => void;
   resetQuiz: () => void;
+  ensureDaily: () => void;
+  answerDaily: (text: string, who?: "me" | "partner") => void;
+  skipDaily: () => void;
   openTask: (id: string | null, from?: TabId) => void;
 };
 
@@ -207,6 +234,12 @@ export const useCouple = create<CoupleState>()(
       capsules: [],
       anniversaryDate: "2024-03-24",
       quiz: { index: 0, myAnswers: [], partnerAnswers: [], consented: false },
+      daily: {
+        date: "",
+        questionId: "real",
+        skippedIds: [],
+        history: [],
+      },
       openTaskId: null,
       taskReturn: null,
       createPair: () => set({ pairCode: code(), waiting: true, joined: false }),
@@ -491,6 +524,63 @@ export const useCouple = create<CoupleState>()(
         set({
           quiz: { index: 0, myAnswers: [], partnerAnswers: [], consented: false },
         }),
+      ensureDaily: () => {
+        const today = new Date().toISOString().slice(0, 10);
+        const daily = get().daily;
+        if (daily.date === today && daily.questionId) return;
+        const history = [...(daily.history ?? [])];
+        if (daily.date && daily.date !== today && (daily.myAnswer || daily.partnerAnswer)) {
+          const q = questionById(daily.questionId);
+          history.unshift({
+            date: daily.date,
+            questionId: daily.questionId,
+            topic: q.topic,
+            text: q.text,
+            myAnswer: daily.myAnswer,
+            myAt: daily.myAt,
+            partnerAnswer: daily.partnerAnswer,
+            partnerAt: daily.partnerAt,
+          });
+        }
+        const next = pickQuestion(today, daily.skippedIds ?? []);
+        set({
+          daily: {
+            date: today,
+            questionId: next.id,
+            skippedIds: daily.skippedIds ?? [],
+            history,
+          },
+        });
+      },
+      answerDaily: (text, who = "me") => {
+        const value = text.trim();
+        if (!value) return;
+        get().ensureDaily();
+        const daily = get().daily;
+        if (who === "me" && daily.myAnswer) return;
+        if (who === "partner" && daily.partnerAnswer) return;
+        set({
+          daily:
+            who === "partner"
+              ? { ...daily, partnerAnswer: value, partnerAt: new Date().toISOString() }
+              : { ...daily, myAnswer: value, myAt: new Date().toISOString() },
+        });
+      },
+      skipDaily: () => {
+        get().ensureDaily();
+        const daily = get().daily;
+        const today = daily.date;
+        const skippedIds = [...new Set([...(daily.skippedIds ?? []), daily.questionId])];
+        const next = pickQuestion(today, skippedIds);
+        set({
+          daily: {
+            date: today,
+            questionId: next.id,
+            skippedIds,
+            history: daily.history ?? [],
+          },
+        });
+      },
       openTask: (id, from) => {
         if (id) {
           set({ openTaskId: id, taskReturn: from ?? get().tab });
@@ -518,6 +608,12 @@ export const useCouple = create<CoupleState>()(
           votes: raw.votes ?? [],
           capsules: raw.capsules ?? [],
           quiz: raw.quiz ?? { index: 0, myAnswers: [], partnerAnswers: [], consented: false },
+          daily: raw.daily ?? {
+            date: "",
+            questionId: "real",
+            skippedIds: [],
+            history: [],
+          },
         };
       },
     },

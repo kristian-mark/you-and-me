@@ -7,6 +7,7 @@ import {
   format,
   isSameMonth,
   isToday,
+  parseISO,
   startOfMonth,
   startOfWeek,
 } from "date-fns";
@@ -41,6 +42,7 @@ import { GiftRadarScreen } from "@/components/gift-radar-screen";
 import { VotingScreen } from "@/components/voting-screen";
 import { CapsuleScreen } from "@/components/capsule-screen";
 import { CompatibilityScreen } from "@/components/compatibility-screen";
+import { QuestionDayScreen } from "@/components/question-day-screen";
 import { NewTaskSheet } from "@/components/new-task-sheet";
 import { NewWishSheet } from "@/components/new-wish-sheet";
 import { EmptyState, ScreenHeader, UsBadge } from "@/components/ui/shell";
@@ -1494,6 +1496,10 @@ export function MoreScreen() {
     return <CompatibilityScreen onBack={() => setMore(null)} />;
   }
 
+  if (moreOpen === "question") {
+    return <QuestionDayScreen onBack={() => setMore(null)} />;
+  }
+
   if (moreOpen === "settings") {
     return <BirthdaySettings onBack={() => setMore(null)} />;
   }
@@ -1561,16 +1567,17 @@ function BirthdaySettings({ onBack }: { onBack: () => void }) {
   const setPartnerBirthday = useCouple((s) => s.setPartnerBirthday);
   const myLocked = Boolean(myBirthday) && myBirthdayEdits >= 1;
   const partnerLocked = Boolean(partnerBirthday) && partnerBirthdayEdits >= 1;
+  const prettyCode = (pairCode ?? "").split("").join(" ");
 
   return (
     <section className="px-5 pt-6 pb-28">
-      <button type="button" onClick={onBack} className="text-muted">
+      <button type="button" onClick={onBack} className="text-[17px] text-muted">
         ‹ Ещё
       </button>
-      <h1 className="mt-4 text-[32px] font-semibold">Настройки</h1>
-      <div className="mt-6 rounded-2xl bg-raised p-5">
-        <p className="text-sm text-muted">Код пары</p>
-        <p className="mt-2 text-3xl font-bold tracking-[0.2em] text-pink">{pairCode}</p>
+      <h1 className="mt-5 text-[34px] font-semibold tracking-tight">Настройки</h1>
+      <div className="mt-6 rounded-[22px] bg-raised px-5 py-5">
+        <p className="text-[13px] text-muted">Код пары</p>
+        <p className="mt-3 text-[28px] font-semibold tracking-[0.18em] text-pink">{prettyCode}</p>
       </div>
       <BirthdayField
         label="Мой день рождения"
@@ -1581,7 +1588,7 @@ function BirthdaySettings({ onBack }: { onBack: () => void }) {
             ? "Дату уже меняли один раз — больше нельзя"
             : myBirthday
               ? "Можно поменять ещё один раз"
-              : "Укажи при регистрации. Позже подтянем из Google."
+              : "Укажи здесь. Позже подтянем из Google."
         }
         onSave={setMyBirthday}
       />
@@ -1599,7 +1606,7 @@ function BirthdaySettings({ onBack }: { onBack: () => void }) {
       <button
         type="button"
         onClick={leavePair}
-        className="mt-6 w-full rounded-2xl bg-raised py-4 text-muted"
+        className="mt-4 w-full rounded-[22px] bg-raised py-4 text-[16px] text-muted"
       >
         Выйти из пары
       </button>
@@ -1622,22 +1629,38 @@ function BirthdayField({
 }) {
   const [draft, setDraft] = useState(value);
   const [msg, setMsg] = useState("");
+  const shown = draft
+    ? format(parseISO(draft), "d MMMM yyyy", { locale: ru })
+    : "Выбрать дату";
+
   return (
-    <div className="mt-4 rounded-2xl bg-raised p-5">
-      <p className="text-sm text-muted">{label}</p>
-      <input
-        type="date"
-        value={draft}
-        disabled={locked}
-        onChange={(e) => setDraft(e.target.value)}
-        className="mt-3 w-full rounded-xl bg-chip px-3 py-3 outline-none disabled:opacity-50"
-      />
-      <p className="mt-2 text-sm text-muted">{hint}</p>
+    <div className="mt-3 rounded-[22px] bg-raised px-5 py-5">
+      <p className="text-[13px] text-muted">{label}</p>
+      <label className="relative mt-3 block">
+        <div
+          className={`rounded-2xl bg-chip px-4 py-3.5 text-[16px] ${
+            draft ? "text-fg" : "text-muted"
+          } ${locked ? "opacity-60" : ""}`}
+        >
+          {shown}
+        </div>
+        <input
+          type="date"
+          value={draft}
+          disabled={locked}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setMsg("");
+          }}
+          className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-default"
+        />
+      </label>
+      <p className="mt-2 text-[13px] leading-5 text-muted">{hint}</p>
       {locked ? null : (
         <button
           type="button"
-          onClick={() => setMsg(onSave(draft) ? "Сохранено" : "Нельзя изменить")}
-          className="mt-3 w-full rounded-xl bg-chip py-3 font-medium"
+          onClick={() => setMsg(onSave(draft) ? "Сохранено" : "Сначала выбери дату")}
+          className="mt-3 w-full rounded-full bg-cream py-3.5 text-[16px] font-semibold text-cream-fg"
         >
           Сохранить дату
         </button>
