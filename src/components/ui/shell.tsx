@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useState } from "react";
 import {
   CalendarDays,
   CheckSquare,
@@ -8,6 +9,7 @@ import {
   Plus,
 } from "lucide-react";
 import { useCouple, type TabId } from "@/lib/couple-store";
+import { UsScreen } from "@/components/us-screen";
 
 const TABS: { id: TabId; label: string; icon: typeof CheckSquare }[] = [
   { id: "tasks", label: "Задачи", icon: CheckSquare },
@@ -18,14 +20,22 @@ const TABS: { id: TabId; label: string; icon: typeof CheckSquare }[] = [
 ];
 
 export function UsBadge() {
+  const [open, setOpen] = useState(false);
   return (
-    <div className="flex items-center gap-2 rounded-full bg-raised px-3 py-2">
-      <span className="text-sm text-fg">Мы</span>
-      <span className="relative h-5 w-8">
-        <span className="absolute left-0 top-0.5 size-4 rounded-full bg-blue" />
-        <span className="absolute right-0 top-0.5 size-4 rounded-full bg-pink" />
-      </span>
-    </div>
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-2 rounded-full bg-raised px-3 py-2"
+      >
+        <span className="text-sm text-fg">Мы</span>
+        <span className="relative h-5 w-8">
+          <span className="absolute left-0 top-0.5 size-4 rounded-full bg-blue" />
+          <span className="absolute right-0 top-0.5 size-4 rounded-full bg-pink" />
+        </span>
+      </button>
+      {open ? <UsScreen onClose={() => setOpen(false)} /> : null}
+    </>
   );
 }
 

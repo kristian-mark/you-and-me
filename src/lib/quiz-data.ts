@@ -566,15 +566,4 @@ function duoSummary(score: number, match: number, insight: number, ranked: Topic
   return `Совместимость ${score} из 100. Совпадение ответов ${match}%, точность взгляда ${insight}%. Больше всего расходится ${hard.join(" и ")}.`;
 }
 
-export function scoreAnswers(mine: number[], partner?: number[]) {
-  const r = buildReport(mine, partner);
-  return {
-    score: r.score,
-    healthy: r.climate,
-    match: r.match,
-    insight: r.insight,
-    weak: r.weak.map((t) => t.topic),
-  };
-}
-
-export { GROWTH, SEE };
+export { SEE };

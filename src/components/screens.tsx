@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
   addMonths,
   eachDayOfInterval,
@@ -43,6 +43,8 @@ import { VotingScreen } from "@/components/voting-screen";
 import { CapsuleScreen } from "@/components/capsule-screen";
 import { CompatibilityScreen } from "@/components/compatibility-screen";
 import { QuestionDayScreen } from "@/components/question-day-screen";
+import { CardsScreen } from "@/components/cards-screen";
+import { BudgetScreen } from "@/components/budget-screen";
 import { NewTaskSheet } from "@/components/new-task-sheet";
 import { NewWishSheet } from "@/components/new-wish-sheet";
 import { EmptyState, ScreenHeader, UsBadge } from "@/components/ui/shell";
@@ -1498,6 +1500,14 @@ export function MoreScreen() {
 
   if (moreOpen === "question") {
     return <QuestionDayScreen onBack={() => setMore(null)} />;
+  }
+
+  if (moreOpen === "cards") {
+    return <CardsScreen onBack={() => setMore(null)} />;
+  }
+
+  if (moreOpen === "budget") {
+    return <BudgetScreen onBack={() => setMore(null)} />;
   }
 
   if (moreOpen === "settings") {

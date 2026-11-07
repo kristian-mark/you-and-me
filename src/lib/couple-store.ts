@@ -103,6 +103,80 @@ export type Capsule = {
   author: "me" | "partner";
 };
 
+export type CardKind = "ean13" | "code128" | "qr";
+export type LoyaltyCard = {
+  id: string;
+  title: string;
+  number: string;
+  kind: CardKind;
+  color: string;
+};
+export type ChatMsg = {
+  id: string;
+  at: string;
+  author: "me" | "partner";
+  text: string;
+  cardId?: string;
+};
+
+export type BudgetTx = {
+  id: string;
+  kind: "expense" | "income";
+  amount: number;
+  currency: string;
+  categoryId: string;
+  date: string;
+  paidBy: "me" | "partner";
+  note: string;
+  createdAt: string;
+};
+export type BudgetCategory = {
+  id: string;
+  title: string;
+  kind: "expense" | "income";
+  icon: string;
+  color: string;
+  hidden?: boolean;
+};
+export type BudgetAccount = { id: string; title: string };
+export type BudgetLimitLog = { id: string; key: string; title: string; amount: number | null; at: string };
+export type RecurringPayment = {
+  id: string;
+  kind: "expense" | "income";
+  title: string;
+  amount: number;
+  currency: string;
+  categoryId: string;
+  accountId: string;
+  paidBy: "me" | "partner";
+  freq: "month" | "week" | "biweek" | "year";
+  day: number;
+  mode: "auto" | "confirm";
+  remindAt: string;
+  lastPosted: string;
+};
+export type BudgetAlert = { id: string; title: string; body: string; at: string };
+export type BudgetState = {
+  currency: string;
+  txs: BudgetTx[];
+  categories: BudgetCategory[];
+  accounts: BudgetAccount[];
+  monthLimit: number | null;
+  monthLimitFrom: string | null;
+  catLimits: Record<string, number>;
+  limitLog: BudgetLimitLog[];
+  recurring: RecurringPayment[];
+  alerts: BudgetAlert[];
+};
+export type Person = {
+  id: string;
+  name: string;
+  date: string;
+  relation: string;
+  note: string;
+  noYear: boolean;
+};
+
 export type QuizState = {
   index: number;
   myAnswers: number[];
@@ -157,14 +231,21 @@ type CoupleState = {
   votes: VotePoll[];
   capsules: Capsule[];
   anniversaryDate: string;
+  gettingMarried: boolean;
+  weddingDate: string;
+  people: Person[];
   quiz: QuizState;
   daily: DailyState;
+  cards: LoyaltyCard[];
+  chat: ChatMsg[];
+  budget: BudgetState;
   openTaskId: string | null;
   taskReturn: TabId | null;
   createPair: () => void;
   joinPair: (code: string) => boolean;
   partnerArrived: () => void;
   leavePair: () => void;
+  setMyName: (name: string) => void;
   setMyBirthday: (iso: string) => boolean;
   setPartnerBirthday: (iso: string) => boolean;
   setTab: (tab: TabId) => void;
@@ -201,12 +282,78 @@ type CoupleState = {
   ensureDaily: () => void;
   answerDaily: (text: string, who?: "me" | "partner") => void;
   skipDaily: () => void;
+  addCard: (input: { title: string; number: string; kind: CardKind; color: string }) => void;
+  updateCard: (id: string, input: Partial<LoyaltyCard>) => void;
+  deleteCard: (id: string) => void;
+  addChat: (text: string, cardId?: string) => void;
+  setBudgetCurrency: (code: string) => void;
+  addBudgetTx: (input: Omit<BudgetTx, "id" | "createdAt">) => void;
+  deleteBudgetTx: (id: string) => void;
+  addBudgetCategory: (input: Omit<BudgetCategory, "id">) => string;
+  updateBudgetCategory: (id: string, input: Partial<BudgetCategory>) => void;
+  addBudgetAccount: (title: string) => void;
+  setBudgetLimit: (key: string, amount: number | null, title?: string) => void;
+  addRecurring: (input: Omit<RecurringPayment, "id" | "lastPosted">) => void;
+  updateRecurring: (id: string, input: Partial<RecurringPayment>) => void;
+  deleteRecurring: (id: string) => void;
+  markRecurringPosted: (id: string, period: string) => void;
+  setAnniversaryDate: (iso: string) => void;
+  setGettingMarried: (on: boolean, date?: string) => void;
+  addPerson: (input: { name: string; date: string; relation: string; note: string; noYear: boolean }) => void;
+  updatePerson: (id: string, input: Partial<Person>) => void;
+  deletePerson: (id: string) => void;
   openTask: (id: string | null, from?: TabId) => void;
 };
 
 function code() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
+
+const MONTH_RU = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
+
+function limitAlerts(budget: BudgetState, input: Omit<BudgetTx, "id" | "createdAt">): BudgetAlert[] {
+  if (input.kind !== "expense") return budget.alerts ?? [];
+  const month = input.date.slice(0, 7);
+  const inMonth = (t: BudgetTx) => t.kind === "expense" && t.date.startsWith(month);
+  const prevCat = budget.txs.filter((t) => inMonth(t) && t.categoryId === input.categoryId).reduce((s, t) => s + t.amount, 0);
+  const nextCat = prevCat + input.amount;
+  const prevAll = budget.txs.filter(inMonth).reduce((s, t) => s + t.amount, 0);
+  const nextAll = prevAll + input.amount;
+  const list = [...(budget.alerts ?? [])];
+  const monthName = MONTH_RU[Number(month.slice(5)) - 1] ?? month;
+  const fmt = (n: number) =>
+    input.currency === "USD" ? `$${Math.round(n).toLocaleString("en-US")}` : `${Math.round(n)} ${input.currency}`;
+  const ping = (title: string, body: string, tag: string, delay = 0) => {
+    list.unshift({ id: crypto.randomUUID(), title, body, at: new Date().toISOString() });
+    if (typeof window === "undefined" || typeof Notification === "undefined") return;
+    const show = () => {
+      try {
+        new Notification(title, { body, tag });
+      } catch {
+        /* ignore */
+      }
+    };
+    const run = () => {
+      if (Notification.permission === "granted") show();
+      else if (Notification.permission === "default") void Notification.requestPermission().then((p) => p === "granted" && show());
+    };
+    window.setTimeout(run, delay);
+  };
+  const cap = budget.catLimits?.[input.categoryId];
+  if (cap && prevCat < cap && nextCat >= cap) {
+    const name = budget.categories.find((c) => c.id === input.categoryId)?.title ?? "Категория";
+    ping(`Лимит · ${name}`, `${Math.round((nextCat / cap) * 100)}% — ${fmt(nextCat)} из ${fmt(cap)} за ${monthName}. Лимит категории превышен.`, `cat-${input.categoryId}`, 0);
+  }
+  if (budget.monthLimit && prevAll < budget.monthLimit && nextAll >= budget.monthLimit) {
+    ping(
+      "Месячный лимит расходов",
+      `${Math.round((nextAll / budget.monthLimit) * 100)}% — ${fmt(nextAll)} из ${fmt(budget.monthLimit)} за ${monthName}. Лимит на месяц превышен.`,
+      `month-${month}`,
+      cap && prevCat < cap && nextCat >= cap ? 400 : 0,
+    );
+  }
+  return list.slice(0, 20);
 }
 
 export const useCouple = create<CoupleState>()(
@@ -232,13 +379,30 @@ export const useCouple = create<CoupleState>()(
       noteFolders: [],
       votes: [],
       capsules: [],
-      anniversaryDate: "2024-03-24",
+      anniversaryDate: "2021-03-24",
+      gettingMarried: false,
+      weddingDate: "",
+      people: [],
       quiz: { index: 0, myAnswers: [], partnerAnswers: [], consented: false },
       daily: {
         date: "",
         questionId: "real",
         skippedIds: [],
         history: [],
+      },
+      cards: [],
+      chat: [],
+      budget: {
+        currency: "USD",
+        txs: [],
+        categories: [],
+        accounts: [],
+        monthLimit: null,
+        monthLimitFrom: null,
+        catLimits: {},
+        limitLog: [],
+        recurring: [],
+        alerts: [],
       },
       openTaskId: null,
       taskReturn: null,
@@ -257,6 +421,10 @@ export const useCouple = create<CoupleState>()(
         return false;
       },
       partnerArrived: () => set({ waiting: false, joined: true }),
+      setMyName: (name) => {
+        const value = name.trim();
+        if (value) set({ myName: value });
+      },
       leavePair: () =>
         set({
           pairCode: null,
@@ -581,6 +749,118 @@ export const useCouple = create<CoupleState>()(
           },
         });
       },
+      addCard: (input) =>
+        set({ cards: [{ id: crypto.randomUUID(), ...input }, ...get().cards] }),
+      updateCard: (id, input) =>
+        set({ cards: get().cards.map((c) => (c.id === id ? { ...c, ...input } : c)) }),
+      deleteCard: (id) => set({ cards: get().cards.filter((c) => c.id !== id) }),
+      addChat: (text, cardId) =>
+        set({
+          chat: [
+            { id: crypto.randomUUID(), at: new Date().toISOString(), author: "me", text, cardId },
+            ...get().chat,
+          ],
+        }),
+      setBudgetCurrency: (code) => set({ budget: { ...get().budget, currency: code } }),
+      addBudgetTx: (input) => {
+        const budget = get().budget;
+        set({
+          budget: {
+            ...budget,
+            txs: [{ ...input, id: crypto.randomUUID(), createdAt: new Date().toISOString() }, ...budget.txs],
+            alerts: limitAlerts(budget, input),
+          },
+        });
+      },
+      deleteBudgetTx: (id) =>
+        set({ budget: { ...get().budget, txs: get().budget.txs.filter((t) => t.id !== id) } }),
+      addBudgetCategory: (input) => {
+        const id = crypto.randomUUID();
+        set({ budget: { ...get().budget, categories: [...get().budget.categories, { ...input, id }] } });
+        return id;
+      },
+      updateBudgetCategory: (id, input) => {
+        const list = get().budget.categories;
+        const found = list.some((c) => c.id === id);
+        set({
+          budget: {
+            ...get().budget,
+            categories: found
+              ? list.map((c) => (c.id === id ? { ...c, ...input } : c))
+              : [...list, { id, title: "", kind: "expense", icon: "more", color: "#2a2d36", ...input }],
+          },
+        });
+      },
+      addBudgetAccount: (title) => {
+        const name = title.trim();
+        if (!name) return;
+        set({
+          budget: {
+            ...get().budget,
+            accounts: [...get().budget.accounts, { id: crypto.randomUUID(), title: name }],
+          },
+        });
+      },
+      setBudgetLimit: (key, amount, title) => {
+        const budget = get().budget;
+        const label = title || (key === "__month__" ? "Общий лимит" : "Категория");
+        const log = [
+          { id: crypto.randomUUID(), key, title: label, amount: amount && amount > 0 ? amount : null, at: new Date().toISOString() },
+          ...(budget.limitLog ?? []),
+        ].slice(0, 50);
+        if (key === "__month__") {
+          const from = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+          set({
+            budget: {
+              ...budget,
+              monthLimit: amount && amount > 0 ? amount : null,
+              monthLimitFrom: amount && amount > 0 ? budget.monthLimitFrom ?? from : null,
+              limitLog: log,
+            },
+          });
+          return;
+        }
+        const next = { ...(budget.catLimits ?? {}) };
+        if (!amount || amount <= 0) delete next[key];
+        else next[key] = amount;
+        set({ budget: { ...budget, catLimits: next, limitLog: log } });
+      },
+      addRecurring: (input) =>
+        set({
+          budget: {
+            ...get().budget,
+            recurring: [{ ...input, id: crypto.randomUUID(), lastPosted: "" }, ...(get().budget.recurring ?? [])],
+          },
+        }),
+      updateRecurring: (id, input) =>
+        set({
+          budget: {
+            ...get().budget,
+            recurring: (get().budget.recurring ?? []).map((r) => (r.id === id ? { ...r, ...input } : r)),
+          },
+        }),
+      deleteRecurring: (id) =>
+        set({
+          budget: { ...get().budget, recurring: (get().budget.recurring ?? []).filter((r) => r.id !== id) },
+        }),
+      markRecurringPosted: (id, period) =>
+        set({
+          budget: {
+            ...get().budget,
+            recurring: (get().budget.recurring ?? []).map((r) => (r.id === id ? { ...r, lastPosted: period } : r)),
+          },
+        }),
+      setAnniversaryDate: (iso) => set({ anniversaryDate: iso }),
+      setGettingMarried: (on, date) => set({ gettingMarried: on, weddingDate: date ?? get().weddingDate }),
+      addPerson: (input) =>
+        set({
+          people: [{ id: crypto.randomUUID(), ...input }, ...get().people],
+        }),
+      updatePerson: (id, input) =>
+        set({
+          people: get().people.map((p) => (p.id === id ? { ...p, ...input } : p)),
+        }),
+      deletePerson: (id) => set({ people: get().people.filter((p) => p.id !== id) }),
       openTask: (id, from) => {
         if (id) {
           set({ openTaskId: id, taskReturn: from ?? get().tab });
@@ -607,6 +887,24 @@ export const useCouple = create<CoupleState>()(
           noteFolders: raw.noteFolders ?? [],
           votes: raw.votes ?? [],
           capsules: raw.capsules ?? [],
+          cards: raw.cards ?? [],
+          chat: raw.chat ?? [],
+          people: raw.people ?? [],
+          gettingMarried: raw.gettingMarried ?? false,
+          weddingDate: raw.weddingDate ?? "",
+          budget: {
+            currency: "USD",
+            txs: [],
+            categories: [],
+            accounts: [],
+            monthLimit: null,
+            monthLimitFrom: null,
+            catLimits: {},
+            limitLog: [],
+            recurring: [],
+            alerts: [],
+            ...(raw.budget ?? {}),
+          },
           quiz: raw.quiz ?? { index: 0, myAnswers: [], partnerAnswers: [], consented: false },
           daily: raw.daily ?? {
             date: "",
