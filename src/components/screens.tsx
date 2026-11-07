@@ -45,6 +45,7 @@ import { CompatibilityScreen } from "@/components/compatibility-screen";
 import { QuestionDayScreen } from "@/components/question-day-screen";
 import { CardsScreen } from "@/components/cards-screen";
 import { BudgetScreen } from "@/components/budget-screen";
+import { GamesScreen } from "@/components/games-screen";
 import { NewTaskSheet } from "@/components/new-task-sheet";
 import { NewWishSheet } from "@/components/new-wish-sheet";
 import { EmptyState, ScreenHeader, UsBadge } from "@/components/ui/shell";
@@ -1508,6 +1509,10 @@ export function MoreScreen() {
 
   if (moreOpen === "budget") {
     return <BudgetScreen onBack={() => setMore(null)} />;
+  }
+
+  if (moreOpen === "games") {
+    return <GamesScreen onBack={() => setMore(null)} />;
   }
 
   if (moreOpen === "settings") {

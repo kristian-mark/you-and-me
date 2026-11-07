@@ -110,6 +110,7 @@ export type LoyaltyCard = {
   number: string;
   kind: CardKind;
   color: string;
+  owner?: "me" | "partner";
 };
 export type ChatMsg = {
   id: string;
@@ -118,6 +119,9 @@ export type ChatMsg = {
   text: string;
   cardId?: string;
 };
+
+export type GameWins = { me: number; partner: number };
+export type TttRecord = { me: number; partner: number; games: number };
 
 export type BudgetTx = {
   id: string;
@@ -211,6 +215,7 @@ export type DailyState = {
 
 type CoupleState = {
   pairCode: string | null;
+  seat: "a" | "b";
   waiting: boolean;
   joined: boolean;
   myName: string;
@@ -238,6 +243,9 @@ type CoupleState = {
   daily: DailyState;
   cards: LoyaltyCard[];
   chat: ChatMsg[];
+  gameWins: GameWins;
+  tttRecord: TttRecord;
+  tttNoted: string;
   budget: BudgetState;
   openTaskId: string | null;
   taskReturn: TabId | null;
@@ -286,6 +294,8 @@ type CoupleState = {
   updateCard: (id: string, input: Partial<LoyaltyCard>) => void;
   deleteCard: (id: string) => void;
   addChat: (text: string, cardId?: string) => void;
+  addGameWin: (who: "me" | "partner") => void;
+  noteTtt: (winner: "me" | "partner" | "draw", key: string) => void;
   setBudgetCurrency: (code: string) => void;
   addBudgetTx: (input: Omit<BudgetTx, "id" | "createdAt">) => void;
   deleteBudgetTx: (id: string) => void;
@@ -360,6 +370,7 @@ export const useCouple = create<CoupleState>()(
   persist(
     (set, get) => ({
       pairCode: null,
+      seat: "a",
       waiting: false,
       joined: false,
       myName: "Кристианс",
@@ -392,6 +403,9 @@ export const useCouple = create<CoupleState>()(
       },
       cards: [],
       chat: [],
+      gameWins: { me: 0, partner: 0 },
+      tttRecord: { me: 0, partner: 0, games: 0 },
+      tttNoted: "",
       budget: {
         currency: "USD",
         txs: [],
@@ -406,7 +420,7 @@ export const useCouple = create<CoupleState>()(
       },
       openTaskId: null,
       taskReturn: null,
-      createPair: () => set({ pairCode: code(), waiting: true, joined: false }),
+      createPair: () => set({ pairCode: code(), seat: "a", waiting: true, joined: false }),
       joinPair: (raw) => {
         const value = raw.trim().toUpperCase();
         const current = get().pairCode;
@@ -415,7 +429,7 @@ export const useCouple = create<CoupleState>()(
           return true;
         }
         if (!current && value.length >= 4) {
-          set({ pairCode: value, waiting: false, joined: true });
+          set({ pairCode: value, seat: "b", waiting: false, joined: true });
           return true;
         }
         return false;
@@ -428,6 +442,7 @@ export const useCouple = create<CoupleState>()(
       leavePair: () =>
         set({
           pairCode: null,
+          seat: "a",
           waiting: false,
           joined: false,
           tab: "tasks",
@@ -761,6 +776,28 @@ export const useCouple = create<CoupleState>()(
             ...get().chat,
           ],
         }),
+      addGameWin: (who) =>
+        set({
+          gameWins: {
+            ...get().gameWins,
+            [who]: (get().gameWins?.[who] ?? 0) + 1,
+          },
+        }),
+      noteTtt: (winner, key) => {
+        if (get().tttNoted === key) return;
+        const record = get().tttRecord ?? { me: 0, partner: 0, games: 0 };
+        const wins = get().gameWins ?? { me: 0, partner: 0 };
+        const nextRecord = {
+          me: record.me + (winner === "me" ? 1 : 0),
+          partner: record.partner + (winner === "partner" ? 1 : 0),
+          games: record.games + 1,
+        };
+        const nextWins =
+          winner === "draw"
+            ? wins
+            : { me: wins.me + 2, partner: wins.partner + 2 };
+        set({ tttRecord: nextRecord, gameWins: nextWins, tttNoted: key });
+      },
       setBudgetCurrency: (code) => set({ budget: { ...get().budget, currency: code } }),
       addBudgetTx: (input) => {
         const budget = get().budget;
@@ -889,6 +926,11 @@ export const useCouple = create<CoupleState>()(
           capsules: raw.capsules ?? [],
           cards: raw.cards ?? [],
           chat: raw.chat ?? [],
+          pairCode: raw.pairCode ?? null,
+          seat: raw.seat === "b" ? "b" : "a",
+          gameWins: raw.gameWins ?? { me: 0, partner: 0 },
+          tttRecord: raw.tttRecord ?? { me: 0, partner: 0, games: 0 },
+          tttNoted: raw.tttNoted ?? "",
           people: raw.people ?? [],
           gettingMarried: raw.gettingMarried ?? false,
           weddingDate: raw.weddingDate ?? "",
