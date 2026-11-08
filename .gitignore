@@ -12,3 +12,5 @@ screenshots
 .project_id
 *.log
 .DS_Store
+
+data/

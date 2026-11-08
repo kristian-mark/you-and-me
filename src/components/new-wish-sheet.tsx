@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, Search } from "lucide-react";
+import { compressPhotoFile } from "@/lib/compress-photo";
 import { useCouple, type Wish, type WishPriority } from "@/lib/couple-store";
+import { packWish, savePairWish } from "@/lib/pair-wishes";
 
 const POPULAR = [
   { code: "RUB", name: "Российский рубль", symbol: "₽" },
@@ -59,28 +61,7 @@ function currencyOf(code: string) {
 }
 
 async function readPhoto(file: File) {
-  const raw = await file.arrayBuffer();
-  const blob = new Blob([raw], { type: file.type || "image/jpeg" });
-  const url = URL.createObjectURL(blob);
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const el = new Image();
-      el.onload = () => resolve(el);
-      el.onerror = reject;
-      el.src = url;
-    });
-    const max = 640;
-    const scale = Math.min(1, max / Math.max(img.width, img.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(img.width * scale));
-    canvas.height = Math.max(1, Math.round(img.height * scale));
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return "";
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg", 0.72);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  return compressPhotoFile(file);
 }
 
 export function NewWishSheet({ wish, onClose }: { wish?: Wish; onClose: () => void }) {
@@ -113,6 +94,9 @@ export function NewWishSheet({ wish, onClose }: { wish?: Wish; onClose: () => vo
     };
     if (wish) updateWish(wish.id, payload);
     else addWish(payload);
+    const latest = useCouple.getState().wishes[0];
+    const stored = wish ? useCouple.getState().wishes.find((w) => w.id === wish.id) : latest;
+    if (stored) void savePairWish({ data: packWish(stored) }).catch(() => undefined);
     onClose();
   };
 

@@ -26,7 +26,7 @@ export function UsBadge() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-full bg-raised px-3 py-2"
+        className="flex items-center gap-2 rounded-full bg-raised px-3 py-[9px]"
       >
         <span className="text-sm text-fg">Мы</span>
         <span className="relative h-5 w-8">
@@ -54,7 +54,7 @@ export function ScreenHeader({
           <button
             type="button"
             onClick={onAdd}
-            className="grid size-11 place-items-center rounded-2xl bg-raised"
+            className="grid size-11 place-items-center rounded-full bg-raised"
             aria-label="Добавить"
           >
             <Plus className="size-5" />
@@ -89,7 +89,7 @@ export function EmptyState({
       <button
         type="button"
         onClick={onAction}
-        className="mt-7 w-full max-w-[340px] rounded-2xl bg-cream py-4 text-[17px] font-semibold text-cream-fg"
+        className="mt-7 w-full max-w-[340px] rounded-full bg-cream py-4 text-[17px] font-semibold text-cream-fg"
       >
         {action}
       </button>

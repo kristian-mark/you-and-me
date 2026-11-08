@@ -2,7 +2,7 @@ import { useState } from "react";
 import { differenceInCalendarDays, format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Cake, Gift } from "lucide-react";
-import { useCouple, type Wish } from "@/lib/couple-store";
+import { useCouple, viewedWishOwner, type Wish } from "@/lib/couple-store";
 
 function nextBirthday(iso: string, from = new Date()) {
   const src = new Date(iso);
@@ -37,11 +37,12 @@ export function GiftRadarScreen({ onBack }: { onBack: () => void }) {
   const partnerName = useCouple((s) => s.partnerName);
   const partnerBirthday = useCouple((s) => s.partnerBirthday);
   const wishes = useCouple((s) => s.wishes);
+  const myUserId = useCouple((s) => s.myUserId);
   const setTab = useCouple((s) => s.setTab);
   const setWishFilter = useCouple((s) => s.setWishFilter);
   const [open, setOpen] = useState<Wish | null>(null);
 
-  const list = wishes.filter((w) => w.owner === "partner" && !w.fulfilled);
+  const list = wishes.filter((w) => viewedWishOwner(w, myUserId) === "partner" && !w.fulfilled);
   const hasDate = Boolean(partnerBirthday);
   const next = hasDate ? nextBirthday(partnerBirthday) : null;
   const days = next ? differenceInCalendarDays(next, new Date()) : null;

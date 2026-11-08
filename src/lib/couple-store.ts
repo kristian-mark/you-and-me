@@ -23,6 +23,7 @@ export type Task = {
   createdAt: string;
   claimedAt?: string;
   assignedBy: "me";
+  ownerUserId?: string | null;
 };
 
 export type EventItem = {
@@ -43,6 +44,7 @@ export type Wish = {
   priority: WishPriority;
   note: string;
   owner: "me" | "partner";
+  ownerUserId?: string | null;
   createdAt: string;
   fulfilled: boolean;
   fulfilledAt?: string;
@@ -220,6 +222,8 @@ type CoupleState = {
   joined: boolean;
   myName: string;
   partnerName: string;
+  myUserId: string | null;
+  partnerUserId: string | null;
   myBirthday: string;
   partnerBirthday: string;
   myBirthdayEdits: number;
@@ -254,6 +258,10 @@ type CoupleState = {
   partnerArrived: () => void;
   leavePair: () => void;
   setMyName: (name: string) => void;
+  setPartnerName: (name: string) => void;
+  setPairUsers: (mine: string | null, partner: string | null) => void;
+  replaceTasks: (tasks: Task[]) => void;
+  replaceWishes: (wishes: Wish[]) => void;
   setMyBirthday: (iso: string) => boolean;
   setPartnerBirthday: (iso: string) => boolean;
   setTab: (tab: TabId) => void;
@@ -366,6 +374,28 @@ function limitAlerts(budget: BudgetState, input: Omit<BudgetTx, "id" | "createdA
   return list.slice(0, 20);
 }
 
+export function viewedOwner(task: Task, myUserId?: string | null): TaskOwner {
+  if (task.ownerUserId === "both") return "both";
+  if (task.ownerUserId && task.ownerUserId !== "free" && myUserId) {
+    return task.ownerUserId === myUserId ? "me" : "partner";
+  }
+  return task.owner;
+}
+
+export function viewedWishOwner(wish: Wish, myUserId?: string | null): "me" | "partner" {
+  if (wish.ownerUserId && myUserId) {
+    return wish.ownerUserId === myUserId ? "me" : "partner";
+  }
+  return wish.owner;
+}
+
+export function ownerUserOf(owner: TaskOwner, myId: string | null, partnerId: string | null) {
+  if (owner === "both") return "both";
+  if (owner === "free") return null;
+  if (owner === "me") return myId;
+  return partnerId;
+}
+
 export const useCouple = create<CoupleState>()(
   persist(
     (set, get) => ({
@@ -375,6 +405,8 @@ export const useCouple = create<CoupleState>()(
       joined: false,
       myName: "Кристианс",
       partnerName: "Алиночка",
+      myUserId: null,
+      partnerUserId: null,
       myBirthday: "",
       partnerBirthday: "2000-03-29",
       myBirthdayEdits: 0,
@@ -439,6 +471,13 @@ export const useCouple = create<CoupleState>()(
         const value = name.trim();
         if (value) set({ myName: value });
       },
+      setPartnerName: (name) => {
+        const value = name.trim();
+        if (value) set({ partnerName: value });
+      },
+      setPairUsers: (mine, partner) => set({ myUserId: mine, partnerUserId: partner }),
+      replaceTasks: (tasks) => set({ tasks }),
+      replaceWishes: (wishes) => set({ wishes }),
       leavePair: () =>
         set({
           pairCode: null,
@@ -485,6 +524,7 @@ export const useCouple = create<CoupleState>()(
               createdAt: new Date().toISOString(),
               assignedBy: "me",
               ...input,
+              ownerUserId: input.ownerUserId ?? ownerUserOf(input.owner, get().myUserId, get().partnerUserId),
               note: input.note ?? "",
             },
             ...get().tasks,
@@ -514,6 +554,7 @@ export const useCouple = create<CoupleState>()(
               ? {
                   ...t,
                   owner,
+                  ownerUserId: ownerUserOf(owner, get().myUserId, get().partnerUserId),
                   claimedAt: owner === "free" ? undefined : new Date().toISOString(),
                   done: owner === "free" ? false : t.done,
                 }
@@ -559,6 +600,7 @@ export const useCouple = create<CoupleState>()(
               createdAt: new Date().toISOString(),
               fulfilled: false,
               ...input,
+              ownerUserId: input.ownerUserId ?? ownerUserOf(input.owner, get().myUserId, get().partnerUserId),
             },
             ...get().wishes,
           ],
@@ -795,7 +837,9 @@ export const useCouple = create<CoupleState>()(
         const nextWins =
           winner === "draw"
             ? wins
-            : { me: wins.me + 2, partner: wins.partner + 2 };
+            : winner === "me"
+              ? { ...wins, me: wins.me + 2 }
+              : { ...wins, partner: wins.partner + 2 };
         set({ tttRecord: nextRecord, gameWins: nextWins, tttNoted: key });
       },
       setBudgetCurrency: (code) => set({ budget: { ...get().budget, currency: code } }),

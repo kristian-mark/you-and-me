@@ -49,7 +49,8 @@ import { GamesScreen } from "@/components/games-screen";
 import { NewTaskSheet } from "@/components/new-task-sheet";
 import { NewWishSheet } from "@/components/new-wish-sheet";
 import { EmptyState, ScreenHeader, UsBadge } from "@/components/ui/shell";
-import { useCouple, type CheckList, type Task, type TaskOwner, type Wish } from "@/lib/couple-store";
+import { useCouple, viewedOwner, viewedWishOwner, type CheckList, type Task, type TaskOwner, type Wish } from "@/lib/couple-store";
+import { deletePairWish } from "@/lib/pair-wishes";
 
 function promptTitle(label: string) {
   const value = window.prompt(label);
@@ -65,26 +66,29 @@ export function TasksScreen() {
   const openTask = useCouple((s) => s.openTask);
   const myName = useCouple((s) => s.myName);
   const partnerName = useCouple((s) => s.partnerName);
+  const myUserId = useCouple((s) => s.myUserId);
   const [sheet, setSheet] = useState<"new" | Task | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "mine" | "partner" | "open">("all");
 
+  const ownerOf = (task: Task) => viewedOwner(task, myUserId);
+
   const counts = {
     all: tasks.length,
-    mine: tasks.filter((t) => t.owner === "me").length,
-    partner: tasks.filter((t) => t.owner === "partner").length,
-    open: tasks.filter((t) => t.owner === "free" && !t.done).length,
+    mine: tasks.filter((t) => ownerOf(t) === "me").length,
+    partner: tasks.filter((t) => ownerOf(t) === "partner").length,
+    open: tasks.filter((t) => ownerOf(t) === "free" && !t.done).length,
   };
 
   const visible = tasks.filter((t) => {
-    if (filter === "mine") return t.owner === "me";
-    if (filter === "partner") return t.owner === "partner";
-    if (filter === "open") return t.owner === "free" && !t.done;
+    if (filter === "mine") return ownerOf(t) === "me";
+    if (filter === "partner") return ownerOf(t) === "partner";
+    if (filter === "open") return ownerOf(t) === "free" && !t.done;
     return true;
   });
 
-  const openTasks = visible.filter((t) => t.owner === "free" && !t.done);
-  const progress = visible.filter((t) => t.owner !== "free" && !t.done);
+  const openTasks = visible.filter((t) => ownerOf(t) === "free" && !t.done);
+  const progress = visible.filter((t) => ownerOf(t) !== "free" && !t.done);
   const done = visible.filter((t) => t.done);
   const selected = tasks.find((t) => t.id === openTaskId);
 
@@ -151,6 +155,7 @@ export function TasksScreen() {
               <TaskCard
                 key={task.id}
                 task={task}
+                viewOwner={ownerOf(task)}
                 partnerName={partnerName}
                 myName={myName}
                 actionLabel="Забрать"
@@ -171,17 +176,18 @@ export function TasksScreen() {
             ))}
           </TaskGroup>
           <TaskGroup title="В работе" items={progress}>
-            {progress.map((task) => (
+            {progress.map((task) => {
+              const mine = ownerOf(task) === "me";
+              return (
               <TaskCard
                 key={task.id}
                 task={task}
+                viewOwner={ownerOf(task)}
                 claimed
                 partnerName={partnerName}
                 myName={myName}
-                actionLabel={task.owner === "me" ? "Готово" : "Забрать"}
-                onAction={() =>
-                  task.owner === "me" ? toggleTask(task.id) : claimTask(task.id, "me")
-                }
+                actionLabel={mine ? "Готово" : undefined}
+                onAction={() => (mine ? toggleTask(task.id) : undefined)}
                 onOpen={() => openTask(task.id, "tasks")}
                 onToggle={() => toggleTask(task.id)}
                 menuOpen={menuId === task.id}
@@ -195,13 +201,15 @@ export function TasksScreen() {
                   deleteTask(task.id);
                 }}
               />
-            ))}
+              );
+            })}
           </TaskGroup>
           <TaskGroup title="Сделано" items={done}>
             {done.map((task) => (
               <TaskCard
                 key={task.id}
                 task={task}
+                viewOwner={ownerOf(task)}
                 partnerName={partnerName}
                 myName={myName}
                 actionLabel="Вернуть"
@@ -260,6 +268,7 @@ function TaskGroup({
 function TaskCard({
   task,
   claimed,
+  viewOwner,
   partnerName,
   myName,
   actionLabel,
@@ -273,9 +282,10 @@ function TaskCard({
 }: {
   task: Task;
   claimed?: boolean;
+  viewOwner?: TaskOwner;
   partnerName: string;
   myName: string;
-  actionLabel: string;
+  actionLabel?: string;
   onAction: () => void;
   onOpen: () => void;
   onToggle: () => void;
@@ -284,13 +294,14 @@ function TaskCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const owner = viewOwner ?? task.owner;
   const subs = asList(task.subtasks);
   const doneCount = subs.filter((s) => s.done).length;
   const who =
-    task.owner === "me" ? "ты" : task.owner === "partner" ? partnerName : task.owner === "both" ? "оба" : "никто";
+    owner === "me" ? "ты" : owner === "partner" ? partnerName : owner === "both" ? "оба" : "никто";
   const status = task.done
     ? "сделано"
-    : task.owner === "free"
+    : owner === "free"
       ? "назначена"
       : "взята";
 
@@ -325,13 +336,15 @@ function TaskCard({
           <button type="button" onClick={onMenu} className="px-1 text-muted" aria-label="Ещё">
             ⋯
           </button>
-          <button
-            type="button"
-            onClick={onAction}
-            className="rounded-xl bg-blue px-3 py-2 text-[13px] font-semibold text-bg"
-          >
-            {actionLabel}
-          </button>
+          {actionLabel ? (
+            <button
+              type="button"
+              onClick={onAction}
+              className="rounded-full bg-blue px-3 py-2 text-[13px] font-semibold text-bg"
+            >
+              {actionLabel}
+            </button>
+          ) : null}
         </div>
       </div>
       {menuOpen ? (
@@ -839,13 +852,17 @@ export function WishesScreen() {
   const setFilter = useCouple((s) => s.setWishFilter);
   const myName = useCouple((s) => s.myName);
   const partnerName = useCouple((s) => s.partnerName);
+  const myUserId = useCouple((s) => s.myUserId);
   const [sheet, setSheet] = useState<"new" | Wish | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const selected = wishes.find((w) => w.id === openId);
+  const who = (wish: Wish) => viewedWishOwner(wish, myUserId);
 
-  const visible = wishes.filter((w) => filter === "all" || w.owner === filter);
-  const myCount = wishes.filter((w) => w.owner === "me" && !w.fulfilled).length;
-  const partnerCount = wishes.filter((w) => w.owner === "partner" && !w.fulfilled).length;
+  const visible = wishes.filter((w) => filter === "all" || who(w) === filter);
+  const openWishes = visible.filter((w) => !w.fulfilled);
+  const doneWishes = visible.filter((w) => w.fulfilled);
+  const myCount = wishes.filter((w) => who(w) === "me" && !w.fulfilled).length;
+  const partnerCount = wishes.filter((w) => who(w) === "partner" && !w.fulfilled).length;
 
   return (
     <section className="flex min-h-0 flex-1 flex-col">
@@ -879,45 +896,29 @@ export function WishesScreen() {
               onAction={() => setSheet("new")}
             />
           ) : (
-            <ul className="space-y-3 px-5 pb-28">
-              {visible.map((wish) => (
-                <li key={wish.id}>
-                  <button
-                    type="button"
-                    onClick={() => setOpenId(wish.id)}
-                    className="flex w-full items-center gap-3 rounded-2xl bg-raised p-3 text-left"
-                  >
-                    {wish.photo ? (
-                      <img
-                        src={wish.photo}
-                        alt=""
-                        className={`size-14 shrink-0 rounded-xl object-cover ${wish.fulfilled ? "opacity-70" : ""}`}
-                      />
-                    ) : (
-                      <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-chip text-muted">
-                        <Gift className="size-6" />
-                      </span>
-                    )}
-                    <span className="min-w-0 flex-1">
-                      <span
-                        className={`block truncate text-[16px] ${
-                          wish.fulfilled ? "text-muted line-through" : ""
-                        }`}
-                      >
-                        {wish.title}
-                      </span>
-                      <span className="mt-1 block text-sm text-muted">
-                        {wish.fulfilled
-                          ? fulfilledLabel(wish.fulfilledAt || wish.createdAt)
-                          : `${wish.price ? formatWishPrice(wish.price, wish.currency) : "без цены"}${
-                              wish.priority === "really" ? " · очень хочу" : " · хочу"
-                            }`}
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <div className="space-y-10 px-5 pb-28">
+              {openWishes.length ? (
+                <ul className="space-y-3">
+                  {openWishes.map((wish) => (
+                    <li key={wish.id}>
+                      <WishRow wish={wish} onOpen={() => setOpenId(wish.id)} />
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {doneWishes.length ? (
+                <div>
+                  <p className="mb-2 text-[11px] tracking-widest text-muted uppercase">Исполненные</p>
+                  <ul className="space-y-3">
+                    {doneWishes.map((wish) => (
+                      <li key={wish.id}>
+                        <WishRow wish={wish} onOpen={() => setOpenId(wish.id)} />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
           )}
         </>
       )}
@@ -929,6 +930,40 @@ export function WishesScreen() {
         />
       ) : null}
     </section>
+  );
+}
+
+function WishRow({ wish, onOpen }: { wish: Wish; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full items-center gap-3 rounded-2xl bg-raised p-3 text-left"
+    >
+      {wish.photo ? (
+        <img
+          src={wish.photo}
+          alt=""
+          className={`size-14 shrink-0 rounded-xl object-cover ${wish.fulfilled ? "opacity-70" : ""}`}
+        />
+      ) : (
+        <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-chip text-muted">
+          <Gift className="size-6" />
+        </span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className={`block truncate text-[16px] ${wish.fulfilled ? "text-muted line-through" : ""}`}>
+          {wish.title}
+        </span>
+        <span className="mt-1 block text-sm text-muted">
+          {wish.fulfilled
+            ? fulfilledLabel(wish.fulfilledAt || wish.createdAt)
+            : `${wish.price ? formatWishPrice(wish.price, wish.currency) : "без цены"}${
+                wish.priority === "really" ? " · очень хочу" : " · хочу"
+              }`}
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -1038,6 +1073,7 @@ function WishDetail({
                 onClick={() => {
                   setMenu(false);
                   deleteWish(wish.id);
+                  void deletePairWish({ data: wish.id }).catch(() => undefined);
                   onBack();
                 }}
                 className="block w-full px-4 py-3 text-left text-pink"
