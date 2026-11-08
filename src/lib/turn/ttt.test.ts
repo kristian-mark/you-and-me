@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assertCanAct, TurnRuleError, type Seat, type TurnSnapshot } from "./engine.ts";
+import { assertCanAct, TurnRuleError, type Seat, type TurnSnapshot, type TurnStep } from "./engine.ts";
 import {
+  beginTtt,
   emptyTttState,
   newTttMatch,
   presentTtt,
@@ -23,13 +24,37 @@ function snap(patch: Partial<TurnSnapshot<TttState>> = {}): TurnSnapshot<TttStat
   };
 }
 
+function asSnap(step: TurnStep<TttState>): TurnSnapshot<TttState> {
+  return { state: step.state, status: step.status, turn: step.turn, winner: step.winner };
+}
+
 function play(snapshot: TurnSnapshot<TttState>, actor: Seat, cell: number) {
-  return tttRules.apply(snapshot, actor, { cell });
+  const ready = snapshot.status === "idle" ? asSnap(beginTtt(snapshot.state, actor)) : snapshot;
+  return tttRules.apply(ready, actor, { cell });
 }
 
 function cells(spec: string): Array<Seat | null> {
   return spec.split("").map((mark) => (mark === "a" || mark === "b" ? mark : null));
 }
+
+test("starting a match gives that seat the first move on an empty board", () => {
+  for (const starter of ["a", "b"] as const) {
+    const opened = beginTtt(emptyTttState(), starter);
+    assert.equal(opened.status, "active");
+    assert.equal(opened.turn, starter);
+    assert.equal(opened.state.starter, starter);
+    assert.equal(
+      opened.state.board.every((cell) => cell === null),
+      true,
+    );
+    const other = starter === "a" ? "b" : "a";
+    assert.throws(() => tttRules.apply(asSnap(opened), other, { cell: 0 }), (error: unknown) => {
+      assert.ok(error instanceof TurnRuleError);
+      assert.equal(error.code, "turn");
+      return true;
+    });
+  }
+});
 
 test("either partner can open an idle match and then must wait", () => {
   for (const starter of ["a", "b"] as const) {
@@ -226,9 +251,9 @@ test("a new match keeps the score and lets either seat start again", () => {
   assert.equal(reopened.state.wins.a, 1);
 });
 
-test("turn gate allows idle for both seats and blocks the waiting seat", () => {
-  assert.doesNotThrow(() => assertCanAct({ status: "idle", turn: null }, "a"));
-  assert.doesNotThrow(() => assertCanAct({ status: "idle", turn: null }, "b"));
+test("turn gate blocks idle and the waiting seat", () => {
+  assert.throws(() => assertCanAct({ status: "idle", turn: null }, "a"));
+  assert.throws(() => assertCanAct({ status: "idle", turn: null }, "b"));
   assert.throws(
     () => assertCanAct({ status: "active", turn: "b" }, "a"),
     (error: unknown) => {
@@ -241,7 +266,7 @@ test("turn gate allows idle for both seats and blocks the waiting seat", () => {
 });
 
 test("stored state must be a real board", () => {
-  const saved = tttRules.apply(snap(), "a", { cell: 1 }).state;
+  const saved = play(snap(), "a", 1).state;
   assert.deepEqual(readTttState(JSON.stringify(saved)), saved);
   assert.throws(() => readTttState({ board: ["a"], starter: "a", wins: { a: 0, b: 0 }, draws: 0 }));
   assert.throws(() =>
@@ -263,7 +288,18 @@ test("the board is shown from the caller's seat", () => {
 });
 
 test("banner uses the couple's turn and result words", () => {
-  assert.equal(tttBanner({ status: "idle", myTurn: true, winner: null }).title, "Твой ход");
+  assert.equal(tttBanner({ status: "idle", myTurn: false, winner: null }).title, "Новая партия");
+  const started = readTttState({
+    board: Array(9).fill(null),
+    starter: "a",
+    wins: { a: 0, b: 0 },
+    draws: 0,
+  });
+  assert.equal(started.starter, "a");
+  assert.equal(
+    started.board.every((cell) => cell === null),
+    true,
+  );
   assert.equal(tttBanner({ status: "active", myTurn: true, winner: null }).title, "Твой ход");
   assert.equal(tttBanner({ status: "active", myTurn: false, winner: null }).title, "Ход партнёра");
   assert.equal(tttBanner({ status: "finished", myTurn: false, winner: "me" }).title, "Победа");

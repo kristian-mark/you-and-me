@@ -6,6 +6,7 @@ import {
   type Seat,
   type TurnRules,
   type TurnSnapshot,
+  type TurnStep,
 } from "./engine.ts";
 
 export type TttState = {
@@ -82,7 +83,6 @@ export function readTttState(raw: unknown): TttState {
   else throw new TurnRuleError("illegal", "Партия повреждена");
   const filled = board.some((cell) => cell !== null);
   if (filled && !starter) throw new TurnRuleError("illegal", "Партия повреждена");
-  if (!filled && starter) throw new TurnRuleError("illegal", "Партия повреждена");
   const winsRaw = rec.wins;
   if (!winsRaw || typeof winsRaw !== "object")
     throw new TurnRuleError("illegal", "Партия повреждена");
@@ -144,6 +144,24 @@ export const tttRules: TurnRules<TttState, TttMove> = {
   },
 };
 
+/** Empty board, this seat to move. Scores carry over. */
+export function beginTtt(previous: TttState, seat: Seat): TurnStep<TttState> {
+  if (previous.board.some((cell) => cell !== null)) {
+    throw new TurnRuleError("illegal", "Партия уже начата");
+  }
+  return {
+    state: {
+      board: emptyTttState().board,
+      starter: seat,
+      wins: { a: previous.wins.a, b: previous.wins.b },
+      draws: previous.draws,
+    },
+    status: "active",
+    turn: seat,
+    winner: null,
+  };
+}
+
 export function newTttMatch(previous: TttState): TttState {
   return {
     board: emptyTttState().board,
@@ -171,7 +189,7 @@ export function presentTtt(
   return {
     status: snapshot.status,
     version,
-    myTurn: snapshot.status === "idle" || (snapshot.status === "active" && snapshot.turn === seat),
+    myTurn: snapshot.status === "active" && snapshot.turn === seat,
     winner,
     board: snapshot.state.board.map((cell) =>
       cell === null ? null : cell === seat ? "me" : "partner",
@@ -205,11 +223,11 @@ export function tttBanner(view: Pick<TttMatchView, "status" | "myTurn" | "winner
     if (view.winner === "partner") return { title: "Поражение", hint: "Линию собрал партнёр" };
     return { title: "Ничья", hint: "Свободных клеток не осталось" };
   }
-  if (view.status === "idle" || view.myTurn) {
-    return {
-      title: "Твой ход",
-      hint: view.status === "idle" ? "Нажми клетку — начнёшь первым" : "Выбери свободную клетку",
-    };
+  if (view.status === "idle") {
+    return { title: "Новая партия", hint: "Кто нажмёт «Начать», тот ходит первым" };
+  }
+  if (view.myTurn) {
+    return { title: "Твой ход", hint: "Выбери свободную клетку" };
   }
   return { title: "Ход партнёра", hint: "Можно закрыть экран и вернуться позже" };
 }

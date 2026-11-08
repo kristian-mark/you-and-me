@@ -7,6 +7,7 @@ export type ProfileRow = {
   invite_code: string;
   birthday: string | null;
   pair_id: string | null;
+  color?: string | null;
 };
 
 export type PairRow = {
@@ -54,6 +55,10 @@ export async function membershipOf(userId: string): Promise<Membership | null> {
 }
 
 export async function ensureMembership(userId: string): Promise<Membership> {
+  if (userId !== "dev-user") {
+    const { assertKnownUser } = await import("@/lib/auth/verify.server");
+    await assertKnownUser(userId);
+  }
   const existing = await membershipOf(userId);
   if (existing) return existing;
   const code = await uniqueCode();

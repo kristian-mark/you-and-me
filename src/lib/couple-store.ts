@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { pickQuestion, questionById } from "@/lib/daily-questions";
+import { pairColors, type PieceColor } from "@/lib/pair-color";
 import {
   DEMO_ANNIVERSARY,
   FALLBACK_MY_NAME,
@@ -236,6 +237,8 @@ type CoupleState = {
   partnerName: string;
   myUserId: string | null;
   partnerUserId: string | null;
+  myColor: PieceColor | null;
+  partnerColor: PieceColor | null;
   inviteCode: string | null;
   deletedTaskIds: string[];
   deletedWishIds: string[];
@@ -283,6 +286,8 @@ type CoupleState = {
     inviteCode: string;
     myBirthday: string | null;
     partnerBirthday: string | null;
+    myColor: PieceColor | null;
+    partnerColor: PieceColor | null;
   }) => void;
   applyCoupleIdentity: (input: {
     myName: string;
@@ -444,6 +449,8 @@ export const useCouple = create<CoupleState>()(
       partnerName: FALLBACK_PARTNER_NAME,
       myUserId: null,
       partnerUserId: null,
+      myColor: null,
+      partnerColor: null,
       inviteCode: null,
       deletedTaskIds: [],
       deletedWishIds: [],
@@ -528,6 +535,8 @@ export const useCouple = create<CoupleState>()(
         }
         if (input.myBirthday && !get().myBirthday) patch.myBirthday = input.myBirthday;
         if (input.partnerBirthday && get().partnerBirthdayEdits === 0) patch.partnerBirthday = input.partnerBirthday;
+        patch.myColor = input.myColor;
+        patch.partnerColor = input.partnerColor;
         set(patch);
       },
       applyCoupleIdentity: (input) => {
@@ -1091,6 +1100,8 @@ export const useCouple = create<CoupleState>()(
           inviteCode: raw.inviteCode ?? null,
           deletedTaskIds: raw.deletedTaskIds ?? [],
           deletedWishIds: raw.deletedWishIds ?? [],
+          myColor: raw.myColor === "blue" || raw.myColor === "pink" ? raw.myColor : null,
+          partnerColor: raw.partnerColor === "blue" || raw.partnerColor === "pink" ? raw.partnerColor : null,
           myName: names.myName,
           partnerName: names.partnerName,
           anniversaryDate: names.anniversaryDate,
@@ -1127,3 +1138,16 @@ export const useCouple = create<CoupleState>()(
     },
   ),
 );
+
+/** The two piece colors, identical on both phones. */
+export function usePlayerColors() {
+  const seat = useCouple((s) => s.seat);
+  const joined = useCouple((s) => s.joined);
+  const myChoice = useCouple((s) => s.myColor);
+  const partnerChoice = useCouple((s) => s.partnerColor);
+  return pairColors({
+    mySeat: joined ? seat : null,
+    myChoice,
+    partnerChoice,
+  });
+}

@@ -1,4 +1,5 @@
 import { getRequest } from "@tanstack/react-start/server";
+import { getSql } from "@/lib/db";
 import { gateIdentityEnabled } from "./gate-identity.server";
 import { auth, authConfigured } from "./server";
 
@@ -93,5 +94,34 @@ export async function requireUserId(bearerToken?: string): Promise<string> {
   }
   const user = await getSessionUser(bearerToken);
   if (!user) throw new UnauthorizedError();
+  await assertKnownUser(user.id);
   return user.id;
+}
+
+/**
+ * The session cookie can outlive the account (Better Auth's cookie cache, or a
+ * session row left behind). Never treat that id as a real user.
+ * Returns when the row exists. Signs the browser out and throws when it does not.
+ */
+export async function assertKnownUser(userId: string) {
+  if (!authConfigured && userId === DEV_USER_ID) return;
+  let exists = false;
+  try {
+    const sql = await getSql();
+    const rows = await sql<{ id: string }>`select "id" from "user" where "id" = ${userId} limit 1`;
+    exists = rows.length > 0;
+  } catch (error) {
+    console.error("[auth] could not check the user row", error);
+    throw new Error("Не удалось проверить аккаунт");
+  }
+  if (exists) return;
+  const request = getRequest();
+  if (request) {
+    try {
+      await auth.api.signOut({ headers: request.headers });
+    } catch (error) {
+      console.error("[auth] sign-out after a missing user failed", error);
+    }
+  }
+  throw new UnauthorizedError();
 }

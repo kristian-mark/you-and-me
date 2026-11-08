@@ -8,7 +8,8 @@ import {
   MoreHorizontal,
   Plus,
 } from "lucide-react";
-import { useCouple, type TabId } from "@/lib/couple-store";
+import { useCouple, usePlayerColors, type TabId } from "@/lib/couple-store";
+import { pieceBg } from "@/lib/pair-color";
 import { UsScreen } from "@/components/us-screen";
 
 const TABS: { id: TabId; label: string; icon: typeof CheckSquare }[] = [
@@ -21,6 +22,7 @@ const TABS: { id: TabId; label: string; icon: typeof CheckSquare }[] = [
 
 export function UsBadge() {
   const [open, setOpen] = useState(false);
+  const colors = usePlayerColors();
   return (
     <>
       <button
@@ -30,8 +32,8 @@ export function UsBadge() {
       >
         <span className="text-sm text-fg">Мы</span>
         <span className="relative h-5 w-8">
-          <span className="absolute left-0 top-0.5 size-4 rounded-full bg-blue" />
-          <span className="absolute right-0 top-0.5 size-4 rounded-full bg-pink" />
+          <span className={`absolute left-0 top-0.5 size-4 rounded-full ${pieceBg(colors.me)}`} />
+          <span className={`absolute right-0 top-0.5 size-4 rounded-full ${pieceBg(colors.partner)}`} />
         </span>
       </button>
       {open ? <UsScreen onClose={() => setOpen(false)} /> : null}

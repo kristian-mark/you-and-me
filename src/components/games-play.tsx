@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState, type ReactNode } from "react";
-import { useCouple } from "@/lib/couple-store";
+import { useCouple, usePlayerColors } from "@/lib/couple-store";
+import { pieceBg } from "@/lib/pair-color";
 import {
   DOTS,
   FLEET_LENGTHS,
@@ -74,11 +75,17 @@ function Shell({
   );
 }
 
+function usePieceClass() {
+  const colors = usePlayerColors();
+  return (side: Side) => pieceBg(side === "me" ? colors.me : colors.partner);
+}
+
 function Turn({ side }: { side: Side }) {
   const { name } = useNames();
+  const pieceClass = usePieceClass();
   return (
     <p className="mt-3 flex items-center gap-2 text-[15px] text-muted">
-      <span className={`size-3 rounded-full ${side === "me" ? "bg-blue" : "bg-pink"}`} />
+      <span className={`size-3 rounded-full ${pieceClass(side)}`} />
       Ход · {name(side)}
     </p>
   );
@@ -106,11 +113,8 @@ function Outcome({
   );
 }
 
-function pieceClass(side: Side) {
-  return side === "me" ? "bg-blue" : "bg-pink";
-}
-
 export function ConnectFour({ onBack, onAgain }: { onBack: () => void; onAgain: () => void }) {
+  const pieceClass = usePieceClass();
   const [board, setBoard] = useState(emptyC4);
   const [turn, setTurn] = useState<Side>("me");
   const result = c4Winner(board);
@@ -148,6 +152,7 @@ export function ConnectFour({ onBack, onAgain }: { onBack: () => void; onAgain: 
 }
 
 export function DotsAndBoxes({ onBack, onAgain }: { onBack: () => void; onAgain: () => void }) {
+  const pieceClass = usePieceClass();
   const [state, setState] = useState<DotsState>(emptyDots);
   const result = dotsWinner(state);
   useAward(result);
@@ -222,6 +227,7 @@ export function DotsAndBoxes({ onBack, onAgain }: { onBack: () => void; onAgain:
 }
 
 export function Reversi({ onBack, onAgain }: { onBack: () => void; onAgain: () => void }) {
+  const pieceClass = usePieceClass();
   const [board, setBoard] = useState<RevCell[][]>(emptyReversi);
   const [turn, setTurn] = useState<Side>("me");
   const moves = reversiMoves(board, turn);
@@ -257,7 +263,7 @@ export function Reversi({ onBack, onAgain }: { onBack: () => void; onAgain: () =
                 className="grid aspect-square place-items-center rounded-md bg-bg"
               >
                 {cell ? <span className={`size-[70%] rounded-full ${pieceClass(cell)}`} /> : null}
-                {can ? <span className={`size-2 rounded-full ${side === "me" ? "bg-blue" : "bg-pink"}`} /> : null}
+                {can ? <span className={`size-2 rounded-full ${pieceClass(side)}`} /> : null}
               </button>
             );
           }),
@@ -269,6 +275,7 @@ export function Reversi({ onBack, onAgain }: { onBack: () => void; onAgain: () =
 }
 
 export function Checkers({ onBack, onAgain }: { onBack: () => void; onAgain: () => void }) {
+  const pieceClass = usePieceClass();
   const [board, setBoard] = useState<Piece[][]>(emptyCheckers);
   const [turn, setTurn] = useState<Side>("me");
   const [quiet, setQuiet] = useState(0);
