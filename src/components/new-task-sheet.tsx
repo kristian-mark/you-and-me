@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Eye, Plus } from "lucide-react";
-import { useCouple, type RepeatKind, type Subtask, type Task, type TaskOwner } from "@/lib/couple-store";
+import { useCouple, viewedOwner, type RepeatKind, type Subtask, type Task, type TaskOwner } from "@/lib/couple-store";
 
 const REPEATS: { id: RepeatKind; label: string }[] = [
   { id: "none", label: "Не повторять" },
@@ -21,12 +21,13 @@ export function NewTaskSheet({ task, onClose }: { task?: Task; onClose: () => vo
   const addTask = useCouple((s) => s.addTask);
   const updateTask = useCouple((s) => s.updateTask);
   const partnerName = useCouple((s) => s.partnerName);
+  const myUserId = useCouple((s) => s.myUserId);
   const dateRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState(task?.title ?? "");
   const [subtasks, setSubtasks] = useState<Subtask[]>(() => asSubtasks(task?.subtasks));
   const [draftSub, setDraftSub] = useState("");
   const [addingSub, setAddingSub] = useState(false);
-  const [owner, setOwner] = useState<TaskOwner>(task?.owner ?? "free");
+  const [owner, setOwner] = useState<TaskOwner>(task ? viewedOwner(task, myUserId) : "free");
   const [dueOn, setDueOn] = useState(Boolean(task?.dueDate));
   const [dueDate, setDueDate] = useState(task?.dueDate ?? format(new Date(), "yyyy-MM-dd"));
   const [repeat, setRepeat] = useState<RepeatKind>(task?.repeat ?? "none");

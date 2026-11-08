@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { authMiddleware } from "@/lib/auth/middleware";
 
 export type TttSeat = "a" | "b";
 
@@ -254,17 +255,19 @@ async function save(next: Row, expectedRevision: number): Promise<Row | null> {
 }
 
 const actTttRemote = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .validator(parse)
-  .handler(async ({ data }): Promise<TttState> => {
-    const row = apply(await load(data.code, data.seat), data, Date.now());
-    if (data.action === "sync") return view(row, data.seat);
-    return view((await save(row, row.revision - 1)) ?? (await load(data.code, data.seat)), data.seat);
+  .handler(async ({ context, data }): Promise<TttState> => {
+    const { membershipOf } = await import("@/lib/pair-access");
+    const member = await membershipOf(context.userId);
+    if (!member?.pairId || !member.seat || !member.pair?.b_user_id) throw new Error("Нет пары");
+    const seated = { ...data, code: member.pairId, seat: member.seat };
+    const row = apply(await load(seated.code, seated.seat), seated, Date.now());
+    if (seated.action === "sync") return view(row, seated.seat);
+    const saved = (await save(row, row.revision - 1)) ?? (await load(seated.code, seated.seat));
+    return view(saved, seated.seat);
   });
 
 export async function actTtt({ data }: { data: TttInput }): Promise<TttState> {
-  try {
-    return await actTttRemote({ data });
-  } catch {
-    return actTttLocal(data);
-  }
+  return actTttRemote({ data });
 }

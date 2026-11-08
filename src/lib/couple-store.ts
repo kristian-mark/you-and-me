@@ -24,6 +24,9 @@ export type Task = {
   claimedAt?: string;
   assignedBy: "me";
   ownerUserId?: string | null;
+  createdBy?: string | null;
+  updatedAt?: string;
+  deleted?: boolean;
 };
 
 export type EventItem = {
@@ -48,6 +51,9 @@ export type Wish = {
   createdAt: string;
   fulfilled: boolean;
   fulfilledAt?: string;
+  photoPath?: string | null;
+  updatedAt?: string;
+  deleted?: boolean;
 };
 
 export type ListItem = {
@@ -224,6 +230,9 @@ type CoupleState = {
   partnerName: string;
   myUserId: string | null;
   partnerUserId: string | null;
+  inviteCode: string | null;
+  deletedTaskIds: string[];
+  deletedWishIds: string[];
   myBirthday: string;
   partnerBirthday: string;
   myBirthdayEdits: number;
@@ -260,8 +269,19 @@ type CoupleState = {
   setMyName: (name: string) => void;
   setPartnerName: (name: string) => void;
   setPairUsers: (mine: string | null, partner: string | null) => void;
+  setSeat: (seat: "a" | "b") => void;
+  applyPairSession: (input: {
+    pairId: string | null;
+    seat: "a" | "b" | null;
+    inviteCode: string;
+    myBirthday: string | null;
+    partnerBirthday: string | null;
+  }) => void;
   replaceTasks: (tasks: Task[]) => void;
   replaceWishes: (wishes: Wish[]) => void;
+  replaceTaskMeta: (id: string, patch: Partial<Task>) => void;
+  replaceWishMeta: (id: string, patch: Partial<Wish>) => void;
+  rememberDeletes: (tasks: string[], wishes: string[]) => void;
   setMyBirthday: (iso: string) => boolean;
   setPartnerBirthday: (iso: string) => boolean;
   setTab: (tab: TabId) => void;
@@ -396,6 +416,10 @@ export function ownerUserOf(owner: TaskOwner, myId: string | null, partnerId: st
   return partnerId;
 }
 
+function stamp() {
+  return new Date().toISOString();
+}
+
 export const useCouple = create<CoupleState>()(
   persist(
     (set, get) => ({
@@ -407,6 +431,9 @@ export const useCouple = create<CoupleState>()(
       partnerName: "Алиночка",
       myUserId: null,
       partnerUserId: null,
+      inviteCode: null,
+      deletedTaskIds: [],
+      deletedWishIds: [],
       myBirthday: "",
       partnerBirthday: "2000-03-29",
       myBirthdayEdits: 0,
@@ -476,8 +503,30 @@ export const useCouple = create<CoupleState>()(
         if (value) set({ partnerName: value });
       },
       setPairUsers: (mine, partner) => set({ myUserId: mine, partnerUserId: partner }),
+      setSeat: (seat) => set({ seat }),
+      applyPairSession: (input) => {
+        const patch: Partial<CoupleState> = { inviteCode: input.inviteCode };
+        if (input.pairId && input.seat) {
+          patch.pairCode = input.pairId;
+          patch.seat = input.seat;
+          patch.joined = true;
+          patch.waiting = false;
+        }
+        if (input.myBirthday && !get().myBirthday) patch.myBirthday = input.myBirthday;
+        if (input.partnerBirthday && get().partnerBirthdayEdits === 0) patch.partnerBirthday = input.partnerBirthday;
+        set(patch);
+      },
       replaceTasks: (tasks) => set({ tasks }),
       replaceWishes: (wishes) => set({ wishes }),
+      replaceTaskMeta: (id, patch) =>
+        set({ tasks: get().tasks.map((task) => (task.id === id ? { ...task, ...patch } : task)) }),
+      replaceWishMeta: (id, patch) =>
+        set({ wishes: get().wishes.map((wish) => (wish.id === id ? { ...wish, ...patch } : wish)) }),
+      rememberDeletes: (tasks, wishes) =>
+        set({
+          deletedTaskIds: [...new Set([...get().deletedTaskIds, ...tasks])],
+          deletedWishIds: [...new Set([...get().deletedWishIds, ...wishes])],
+        }),
       leavePair: () =>
         set({
           pairCode: null,
@@ -488,6 +537,11 @@ export const useCouple = create<CoupleState>()(
           moreOpen: null,
           openTaskId: null,
           taskReturn: null,
+          tasks: [],
+          wishes: [],
+          deletedTaskIds: [],
+          deletedWishIds: [],
+          partnerUserId: null,
         }),
       setMyBirthday: (iso) => {
         const value = iso.trim();
@@ -525,7 +579,9 @@ export const useCouple = create<CoupleState>()(
               assignedBy: "me",
               ...input,
               ownerUserId: input.ownerUserId ?? ownerUserOf(input.owner, get().myUserId, get().partnerUserId),
+              createdBy: input.createdBy ?? get().myUserId,
               note: input.note ?? "",
+              updatedAt: stamp(),
             },
             ...get().tasks,
           ],
@@ -538,14 +594,25 @@ export const useCouple = create<CoupleState>()(
                   ...t,
                   ...input,
                   note: input.note !== undefined ? input.note : t.note ?? "",
+                  ownerUserId:
+                    input.owner !== undefined
+                      ? ownerUserOf(input.owner, get().myUserId, get().partnerUserId)
+                      : input.ownerUserId !== undefined
+                        ? input.ownerUserId
+                        : t.ownerUserId,
+                  updatedAt: stamp(),
                 }
               : t,
           ),
         }),
-      deleteTask: (id) => set({ tasks: get().tasks.filter((t) => t.id !== id) }),
+      deleteTask: (id) =>
+        set({
+          tasks: get().tasks.filter((task) => task.id !== id),
+          deletedTaskIds: get().deletedTaskIds.includes(id) ? get().deletedTaskIds : [...get().deletedTaskIds, id],
+        }),
       toggleTask: (id) =>
         set({
-          tasks: get().tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)),
+          tasks: get().tasks.map((t) => (t.id === id ? { ...t, done: !t.done, updatedAt: stamp() } : t)),
         }),
       claimTask: (id, owner) =>
         set({
@@ -557,6 +624,7 @@ export const useCouple = create<CoupleState>()(
                   ownerUserId: ownerUserOf(owner, get().myUserId, get().partnerUserId),
                   claimedAt: owner === "free" ? undefined : new Date().toISOString(),
                   done: owner === "free" ? false : t.done,
+                  updatedAt: stamp(),
                 }
               : t,
           ),
@@ -571,6 +639,7 @@ export const useCouple = create<CoupleState>()(
                   subtasks: (t.subtasks ?? []).map((s) =>
                     s.id === subId ? { ...s, done: !s.done } : s,
                   ),
+                  updatedAt: stamp(),
                 },
           ),
         }),
@@ -585,6 +654,7 @@ export const useCouple = create<CoupleState>()(
                     ...(t.subtasks ?? []),
                     { id: crypto.randomUUID(), text, done: false },
                   ],
+                  updatedAt: stamp(),
                 },
           ),
         }),
@@ -601,15 +671,36 @@ export const useCouple = create<CoupleState>()(
               fulfilled: false,
               ...input,
               ownerUserId: input.ownerUserId ?? ownerUserOf(input.owner, get().myUserId, get().partnerUserId),
+              updatedAt: stamp(),
             },
             ...get().wishes,
           ],
         }),
       updateWish: (id, input) =>
         set({
-          wishes: get().wishes.map((w) => (w.id === id ? { ...w, ...input } : w)),
+          wishes: get().wishes.map((wish) =>
+            wish.id === id
+              ? {
+                  ...wish,
+                  ...input,
+                  ownerUserId:
+                    input.owner !== undefined
+                      ? input.owner === "me"
+                        ? get().myUserId
+                        : get().partnerUserId
+                      : input.ownerUserId !== undefined
+                        ? input.ownerUserId
+                        : wish.ownerUserId,
+                  updatedAt: stamp(),
+                }
+              : wish,
+          ),
         }),
-      deleteWish: (id) => set({ wishes: get().wishes.filter((w) => w.id !== id) }),
+      deleteWish: (id) =>
+        set({
+          wishes: get().wishes.filter((wish) => wish.id !== id),
+          deletedWishIds: get().deletedWishIds.includes(id) ? get().deletedWishIds : [...get().deletedWishIds, id],
+        }),
       setWishFilter: (wishFilter) => set({ wishFilter }),
       addList: (input) =>
         set({
@@ -972,6 +1063,9 @@ export const useCouple = create<CoupleState>()(
           chat: raw.chat ?? [],
           pairCode: raw.pairCode ?? null,
           seat: raw.seat === "b" ? "b" : "a",
+          inviteCode: raw.inviteCode ?? null,
+          deletedTaskIds: raw.deletedTaskIds ?? [],
+          deletedWishIds: raw.deletedWishIds ?? [],
           gameWins: raw.gameWins ?? { me: 0, partner: 0 },
           tttRecord: raw.tttRecord ?? { me: 0, partner: 0, games: 0 },
           tttNoted: raw.tttNoted ?? "",

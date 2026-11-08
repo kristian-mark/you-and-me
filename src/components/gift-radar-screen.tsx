@@ -2,6 +2,7 @@ import { useState } from "react";
 import { differenceInCalendarDays, format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Cake, Gift } from "lucide-react";
+import { WishPhoto } from "@/components/wish-photo";
 import { useCouple, viewedWishOwner, type Wish } from "@/lib/couple-store";
 
 function nextBirthday(iso: string, from = new Date()) {
@@ -102,13 +103,15 @@ export function GiftRadarScreen({ onBack }: { onBack: () => void }) {
                 onClick={() => setOpen(wish)}
                 className="flex w-full items-center gap-3 rounded-[22px] bg-raised p-3 text-left"
               >
-                {wish.photo ? (
-                  <img src={wish.photo} alt="" className="size-14 shrink-0 rounded-xl object-cover" />
-                ) : (
-                  <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-chip text-muted">
-                    <Gift className="size-6" />
-                  </span>
-                )}
+                <WishPhoto
+                  wish={wish}
+                  className="size-14 shrink-0 rounded-xl object-cover"
+                  fallback={
+                    <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-chip text-muted">
+                      <Gift className="size-6" />
+                    </span>
+                  }
+                />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[16px]">{wish.title}</span>
                   <span className="mt-1 block text-sm text-muted">
@@ -161,13 +164,15 @@ function RadarWishCard({
         ‹ Радар
       </button>
       <div className="mt-6 overflow-hidden rounded-[28px] bg-raised">
-        {wish.photo ? (
-          <img src={wish.photo} alt="" className="h-48 w-full object-cover" />
-        ) : (
-          <div className="grid h-40 place-items-center text-muted">
-            <Gift className="size-12" />
-          </div>
-        )}
+        <WishPhoto
+          wish={wish}
+          className="h-48 w-full object-cover"
+          fallback={
+            <div className="grid h-40 place-items-center text-muted">
+              <Gift className="size-12" />
+            </div>
+          }
+        />
         <div className="px-5 py-5">
           <p className="text-xs text-muted">хотелка {partnerName}</p>
           <h2 className="mt-1 text-[28px] font-semibold">{wish.title}</h2>

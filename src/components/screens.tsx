@@ -49,8 +49,12 @@ import { GamesScreen } from "@/components/games-screen";
 import { NewTaskSheet } from "@/components/new-task-sheet";
 import { NewWishSheet } from "@/components/new-wish-sheet";
 import { EmptyState, ScreenHeader, UsBadge } from "@/components/ui/shell";
+import { WishPhoto } from "@/components/wish-photo";
 import { useCouple, viewedOwner, viewedWishOwner, type CheckList, type Task, type TaskOwner, type Wish } from "@/lib/couple-store";
+import { leaveSharedPair } from "@/lib/leave-pair";
+import { deletePairTask } from "@/lib/pair-tasks";
 import { deletePairWish } from "@/lib/pair-wishes";
+import { saveMyProfile } from "@/lib/pair-server";
 
 function promptTitle(label: string) {
   const value = window.prompt(label);
@@ -62,9 +66,12 @@ export function TasksScreen() {
   const toggleTask = useCouple((s) => s.toggleTask);
   const claimTask = useCouple((s) => s.claimTask);
   const deleteTask = useCouple((s) => s.deleteTask);
+  const removeTask = (id: string) => {
+    deleteTask(id);
+    void deletePairTask({ data: id }).catch(() => undefined);
+  };
   const openTaskId = useCouple((s) => s.openTaskId);
   const openTask = useCouple((s) => s.openTask);
-  const myName = useCouple((s) => s.myName);
   const partnerName = useCouple((s) => s.partnerName);
   const myUserId = useCouple((s) => s.myUserId);
   const [sheet, setSheet] = useState<"new" | Task | null>(null);
@@ -100,7 +107,7 @@ export function TasksScreen() {
           onBack={() => openTask(null)}
           onEdit={() => setSheet(selected)}
           onDelete={() => {
-            deleteTask(selected.id);
+            removeTask(selected.id);
             openTask(null);
           }}
         />
@@ -157,7 +164,6 @@ export function TasksScreen() {
                 task={task}
                 viewOwner={ownerOf(task)}
                 partnerName={partnerName}
-                myName={myName}
                 actionLabel="Забрать"
                 onAction={() => claimTask(task.id, "me")}
                 onOpen={() => openTask(task.id, "tasks")}
@@ -170,7 +176,7 @@ export function TasksScreen() {
                 }}
                 onDelete={() => {
                   setMenuId(null);
-                  deleteTask(task.id);
+                  removeTask(task.id);
                 }}
               />
             ))}
@@ -185,7 +191,6 @@ export function TasksScreen() {
                 viewOwner={ownerOf(task)}
                 claimed
                 partnerName={partnerName}
-                myName={myName}
                 actionLabel={mine ? "Готово" : undefined}
                 onAction={() => (mine ? toggleTask(task.id) : undefined)}
                 onOpen={() => openTask(task.id, "tasks")}
@@ -198,7 +203,7 @@ export function TasksScreen() {
                 }}
                 onDelete={() => {
                   setMenuId(null);
-                  deleteTask(task.id);
+                  removeTask(task.id);
                 }}
               />
               );
@@ -211,7 +216,6 @@ export function TasksScreen() {
                 task={task}
                 viewOwner={ownerOf(task)}
                 partnerName={partnerName}
-                myName={myName}
                 actionLabel="Вернуть"
                 onAction={() => toggleTask(task.id)}
                 onOpen={() => openTask(task.id, "tasks")}
@@ -224,7 +228,7 @@ export function TasksScreen() {
                 }}
                 onDelete={() => {
                   setMenuId(null);
-                  deleteTask(task.id);
+                  removeTask(task.id);
                 }}
               />
             ))}
@@ -270,7 +274,6 @@ function TaskCard({
   claimed,
   viewOwner,
   partnerName,
-  myName,
   actionLabel,
   onAction,
   onOpen,
@@ -284,7 +287,6 @@ function TaskCard({
   claimed?: boolean;
   viewOwner?: TaskOwner;
   partnerName: string;
-  myName: string;
   actionLabel?: string;
   onAction: () => void;
   onOpen: () => void;
@@ -391,12 +393,17 @@ function TaskDetail({
   const toggleSubtask = useCouple((s) => s.toggleSubtask);
   const addSubtask = useCouple((s) => s.addSubtask);
   const partnerName = useCouple((s) => s.partnerName);
+  const myUserId = useCouple((s) => s.myUserId);
+  const partnerUserId = useCouple((s) => s.partnerUserId);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
   const [menu, setMenu] = useState(false);
   const subs = asList(task.subtasks);
   const doneCount = subs.filter((s) => s.done).length;
-  const free = task.owner === "free";
+  const owner = viewedOwner(task, myUserId);
+  const free = owner === "free";
+  const assigner =
+    task.createdBy && task.createdBy === partnerUserId ? partnerName : task.createdBy && task.createdBy === myUserId ? "ты" : owner === "partner" ? partnerName : "ты";
 
   return (
     <section className="flex min-h-0 flex-1 flex-col px-5 pb-28">
@@ -494,7 +501,7 @@ function TaskDetail({
       </div>
 
       <div className="mt-3 overflow-hidden rounded-2xl bg-raised">
-        <Row label="Назначил" value="ты" />
+        <Row label="Назначил" value={assigner} />
         <Row label="Создана" value={formatDue(createdDate(task))} />
         {task.claimedAt ? <Row label="Взята" value={`ты, ${formatDue(task.claimedAt.slice(0, 10))}`} /> : null}
         {task.dueDate ? <Row label="Срок" value={formatDue(task.dueDate)} /> : null}
@@ -528,11 +535,11 @@ function TaskDetail({
           <button
             type="button"
             onClick={() =>
-              task.owner === "me" || task.done ? toggleTask(task.id) : claimTask(task.id, "me")
+              owner === "me" || task.done ? toggleTask(task.id) : claimTask(task.id, "me")
             }
             className="mt-5 w-full rounded-2xl bg-blue py-4 text-[17px] font-semibold text-bg"
           >
-            {task.done ? "Вернуть в работу" : task.owner === "me" ? "Готово" : "Забрать"}
+            {task.done ? "Вернуть в работу" : owner === "me" ? "Готово" : "Забрать"}
           </button>
           <button
             type="button"
@@ -620,6 +627,7 @@ export function CalendarScreen() {
   const [mode, setMode] = useState<"overview" | "month" | "week">("overview");
   const events = useCouple((s) => s.events);
   const tasks = useCouple((s) => s.tasks);
+  const myUserId = useCouple((s) => s.myUserId);
   const addEvent = useCouple((s) => s.addEvent);
   const openTask = useCouple((s) => s.openTask);
   const setTab = useCouple((s) => s.setTab);
@@ -639,7 +647,7 @@ export function CalendarScreen() {
         title: t.title,
         date: t.dueDate as string,
         kind: "task" as const,
-        owner: t.owner,
+        owner: viewedOwner(t, myUserId),
         done: t.done,
       }));
     const fromLists = lists.flatMap((list) =>
@@ -661,7 +669,7 @@ export function CalendarScreen() {
       done: false,
     }));
     return [...fromTasks, ...fromLists, ...fromEvents].sort((a, b) => a.date.localeCompare(b.date));
-  }, [tasks, events, lists]);
+  }, [tasks, events, lists, myUserId]);
 
   const orderedItems = useMemo(() => {
     return [...calendarItems].sort((a, b) => {
@@ -940,17 +948,15 @@ function WishRow({ wish, onOpen }: { wish: Wish; onOpen: () => void }) {
       onClick={onOpen}
       className="flex w-full items-center gap-3 rounded-2xl bg-raised p-3 text-left"
     >
-      {wish.photo ? (
-        <img
-          src={wish.photo}
-          alt=""
-          className={`size-14 shrink-0 rounded-xl object-cover ${wish.fulfilled ? "opacity-70" : ""}`}
-        />
-      ) : (
-        <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-chip text-muted">
-          <Gift className="size-6" />
-        </span>
-      )}
+      <WishPhoto
+        wish={wish}
+        className={`size-14 shrink-0 rounded-xl object-cover ${wish.fulfilled ? "opacity-70" : ""}`}
+        fallback={
+          <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-chip text-muted">
+            <Gift className="size-6" />
+          </span>
+        }
+      />
       <span className="min-w-0 flex-1">
         <span className={`block truncate text-[16px] ${wish.fulfilled ? "text-muted line-through" : ""}`}>
           {wish.title}
@@ -1025,7 +1031,9 @@ function WishDetail({
   const updateWish = useCouple((s) => s.updateWish);
   const deleteWish = useCouple((s) => s.deleteWish);
   const partnerName = useCouple((s) => s.partnerName);
+  const myUserId = useCouple((s) => s.myUserId);
   const [menu, setMenu] = useState(false);
+  const side = viewedWishOwner(wish, myUserId);
   const when = wish.createdAt
     ? format(new Date(wish.createdAt), "d MMMM", { locale: ru })
     : format(new Date(), "d MMMM", { locale: ru });
@@ -1033,13 +1041,15 @@ function WishDetail({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="relative h-56 shrink-0 overflow-hidden bg-raised">
-        {wish.photo ? (
-          <img src={wish.photo} alt="" className="size-full object-cover" />
-        ) : (
-          <div className="grid size-full place-items-center text-muted">
-            <Gift className="size-16" />
-          </div>
-        )}
+        <WishPhoto
+          wish={wish}
+          className="size-full object-cover"
+          fallback={
+            <div className="grid size-full place-items-center text-muted">
+              <Gift className="size-16" />
+            </div>
+          }
+        />
         <button
           type="button"
           onClick={onBack}
@@ -1087,8 +1097,8 @@ function WishDetail({
 
       <div className="flex-1 overflow-y-auto px-5 pb-36">
         <p className="mt-5 flex items-center gap-2 text-[14px] text-muted">
-          <span className={`size-3 rounded-full ${wish.owner === "me" ? "bg-blue" : "bg-pink"}`} />
-          {wish.owner === "me" ? "Ты" : partnerName} · {when}
+          <span className={`size-3 rounded-full ${side === "me" ? "bg-blue" : "bg-pink"}`} />
+          {side === "me" ? "Ты" : partnerName} · {when}
         </p>
         <h1 className="mt-3 text-[32px] leading-tight font-semibold">{wish.title}</h1>
         {wish.price ? (
@@ -1608,8 +1618,7 @@ export function MoreScreen() {
 }
 
 function BirthdaySettings({ onBack }: { onBack: () => void }) {
-  const pairCode = useCouple((s) => s.pairCode);
-  const leavePair = useCouple((s) => s.leavePair);
+  const inviteCode = useCouple((s) => s.inviteCode);
   const myBirthday = useCouple((s) => s.myBirthday);
   const partnerBirthday = useCouple((s) => s.partnerBirthday);
   const myBirthdayEdits = useCouple((s) => s.myBirthdayEdits);
@@ -1618,7 +1627,12 @@ function BirthdaySettings({ onBack }: { onBack: () => void }) {
   const setPartnerBirthday = useCouple((s) => s.setPartnerBirthday);
   const myLocked = Boolean(myBirthday) && myBirthdayEdits >= 1;
   const partnerLocked = Boolean(partnerBirthday) && partnerBirthdayEdits >= 1;
-  const prettyCode = (pairCode ?? "").split("").join(" ");
+  const prettyCode = (inviteCode ?? "").split("").join(" ");
+  const saveMine = (iso: string) => {
+    const ok = setMyBirthday(iso);
+    if (ok) void saveMyProfile({ data: { birthday: iso } }).catch(() => undefined);
+    return ok;
+  };
 
   return (
     <section className="px-5 pt-6 pb-28">
@@ -1627,7 +1641,7 @@ function BirthdaySettings({ onBack }: { onBack: () => void }) {
       </button>
       <h1 className="mt-5 text-[34px] font-semibold tracking-tight">Настройки</h1>
       <div className="mt-6 rounded-[22px] bg-raised px-5 py-5">
-        <p className="text-[13px] text-muted">Код пары</p>
+        <p className="text-[13px] text-muted">Твой код</p>
         <p className="mt-3 text-[28px] font-semibold tracking-[0.18em] text-pink">{prettyCode}</p>
       </div>
       <BirthdayField
@@ -1641,7 +1655,7 @@ function BirthdaySettings({ onBack }: { onBack: () => void }) {
               ? "Можно поменять ещё один раз"
               : "Укажи здесь. Позже подтянем из Google."
         }
-        onSave={setMyBirthday}
+        onSave={saveMine}
       />
       <BirthdayField
         label="День рождения партнёра"
@@ -1650,13 +1664,13 @@ function BirthdaySettings({ onBack }: { onBack: () => void }) {
         hint={
           partnerLocked
             ? "Дату уже меняли один раз — больше нельзя"
-            : "Пока вручную. Потом возьмём из профиля партнёра."
+            : "Из профиля партнёра. Можно поправить один раз."
         }
         onSave={setPartnerBirthday}
       />
       <button
         type="button"
-        onClick={leavePair}
+        onClick={() => void leaveSharedPair().catch(() => undefined)}
         className="mt-4 w-full rounded-[22px] bg-raised py-4 text-[16px] text-muted"
       >
         Выйти из пары

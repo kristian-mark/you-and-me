@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
 import { ru } from "date-fns/locale";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -10,24 +10,33 @@ import {
   WishesScreen,
 } from "@/components/screens";
 import { TabBar } from "@/components/ui/shell";
+import { RedirectToSignIn } from "@/lib/auth/gates";
+import { authEnabled } from "@/lib/auth/client";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { useCouple } from "@/lib/couple-store";
-import { getMyPair, joinByInvite, leavePairRemote, saveMyProfile, type PairProfile } from "@/lib/pair-server";
-import { listPairTasks, savePairTask } from "@/lib/pair-tasks";
-import { listPairWishes, packWish, savePairWish } from "@/lib/pair-wishes";
 import { compressPhotoData } from "@/lib/compress-photo";
+import { getMyPair, joinByInvite, saveMyProfile, type PairProfile } from "@/lib/pair-server";
+import { mergeSynced } from "@/lib/pair-sync";
+import { deletePairTask, listPairTasks, savePairTask } from "@/lib/pair-tasks";
+import { deletePairWish, listPairWishes, packWish, savePairWish } from "@/lib/pair-wishes";
 
 export function CoupleApp() {
   return <PairGate />;
 }
 
 function PairGate() {
+  const { user, isPending } = useCurrentUserState();
   const setMyName = useCouple((s) => s.setMyName);
   const setPartnerName = useCouple((s) => s.setPartnerName);
   const setPairUsers = useCouple((s) => s.setPairUsers);
+  const applyPairSession = useCouple((s) => s.applyPairSession);
   const partnerArrived = useCouple((s) => s.partnerArrived);
+  const leavePair = useCouple((s) => s.leavePair);
   const [profile, setProfile] = useState<PairProfile | null>(null);
   const [error, setError] = useState("");
+  const [needsLogin, setNeedsLogin] = useState(false);
   const [tick, setTick] = useState(0);
+  const hadPair = useRef(false);
 
   useEffect(() => {
     let stop = false;
@@ -36,17 +45,36 @@ function PairGate() {
         .then((next) => {
           if (stop) return;
           setProfile(next);
+          setNeedsLogin(false);
           setError("");
           const mine = next.displayName;
           if (mine) setMyName(mine);
           if (next.partner?.displayName) setPartnerName(next.partner.displayName);
           setPairUsers(next.userId, next.partner?.userId ?? null);
-          if (next.partner) partnerArrived();
+          applyPairSession({
+            pairId: next.pairId,
+            seat: next.seat,
+            inviteCode: next.inviteCode,
+            myBirthday: next.birthday,
+            partnerBirthday: next.partner?.birthday ?? null,
+          });
+          const storedPair = useCouple.getState().pairCode ?? "";
+          const storedServerPair = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storedPair);
+          if (next.partner) {
+            hadPair.current = true;
+            partnerArrived();
+          } else if (hadPair.current || storedServerPair) {
+            hadPair.current = false;
+            leavePair();
+          }
         })
         .catch((err) => {
           if (stop) return;
           const raw = err instanceof Error ? err.message : "Облако не ответило";
-          if (/unauthor/i.test(raw)) return;
+          if (/unauthor/i.test(raw)) {
+            setNeedsLogin(true);
+            return;
+          }
           setError(raw);
         });
     };
@@ -56,7 +84,7 @@ function PairGate() {
       stop = true;
       window.clearInterval(timer);
     };
-  }, [partnerArrived, setMyName, setPartnerName, setPairUsers, tick]);
+  }, [applyPairSession, leavePair, partnerArrived, setMyName, setPartnerName, setPairUsers, tick]);
 
   useEffect(() => {
     if (!profile?.partner) return;
@@ -64,16 +92,17 @@ function PairGate() {
     const pull = async () => {
       try {
         const rows = await listPairTasks();
-        if (stop) return;
-        const local = useCouple.getState().tasks;
-        const map = new Map(rows.map((task) => [task.id, task]));
-        for (const task of local) {
-          if (!map.has(task.id)) {
-            map.set(task.id, task);
-            void savePairTask({ data: task }).catch(() => undefined);
-          }
-        }
-        useCouple.getState().replaceTasks([...map.values()]);
+        if (stop || !useCouple.getState().joined) return;
+        const state = useCouple.getState();
+        const merged = mergeSynced(
+          state.tasks.filter((task) => !task.deleted),
+          rows,
+          state.deletedTaskIds,
+        );
+        useCouple.getState().rememberDeletes(merged.forget, []);
+        useCouple.getState().replaceTasks(merged.next.filter((task) => !task.deleted));
+        for (const id of merged.retryDelete) void deletePairTask({ data: id }).catch(() => undefined);
+        for (const task of merged.upload) void savePairTask({ data: task }).catch(() => undefined);
       } catch {
         /* keep local */
       }
@@ -92,16 +121,17 @@ function PairGate() {
     const pull = async () => {
       try {
         const rows = await listPairWishes();
-        if (stop) return;
-        const local = useCouple.getState().wishes;
-        const map = new Map(rows.map((wish) => [wish.id, wish]));
-        for (const wish of local) {
-          if (!map.has(wish.id)) {
-            map.set(wish.id, wish);
-            void savePairWish({ data: packWish(wish) }).catch(() => undefined);
-          }
-        }
-        useCouple.getState().replaceWishes([...map.values()]);
+        if (stop || !useCouple.getState().joined) return;
+        const state = useCouple.getState();
+        const merged = mergeSynced(
+          state.wishes.filter((wish) => !wish.deleted),
+          rows,
+          state.deletedWishIds,
+        );
+        useCouple.getState().rememberDeletes([], merged.forget);
+        useCouple.getState().replaceWishes(merged.next.filter((wish) => !wish.deleted));
+        for (const id of merged.retryDelete) void deletePairWish({ data: id }).catch(() => undefined);
+        for (const wish of merged.upload) void savePairWish({ data: packWish(wish) }).catch(() => undefined);
       } catch {
         /* keep local */
       }
@@ -113,6 +143,15 @@ function PairGate() {
       window.clearInterval(timer);
     };
   }, [profile?.partner, profile?.pairId]);
+
+  if (authEnabled && isPending) {
+    return (
+      <main className="grid min-h-dvh place-items-center px-6 text-center text-muted">
+        <p>Собираем профиль…</p>
+      </main>
+    );
+  }
+  if (needsLogin || (authEnabled && !user)) return <RedirectToSignIn />;
 
   if (!profile) {
     return (
@@ -275,26 +314,32 @@ function AppShell() {
   const wishes = useCouple((s) => s.wishes);
   const myUserId = useCouple((s) => s.myUserId);
   const partnerUserId = useCouple((s) => s.partnerUserId);
-  const seen = useState(() => new Map<string, string>())[0];
+  const seen = useRef(new Map<string, string>());
 
   useEffect(() => {
-    for (const task of tasks) {
-      const withOwner = {
-        ...task,
-        ownerUserId: task.ownerUserId ?? (task.owner === "both" ? "both" : task.owner === "me" ? myUserId : task.owner === "partner" ? partnerUserId : null),
-      };
-      const key = JSON.stringify({
-        t: withOwner.title,
-        o: withOwner.ownerUserId,
-        d: withOwner.done,
-        n: withOwner.note,
-        s: withOwner.subtasks,
-      });
-      if (seen.get(`t:${task.id}`) === key) continue;
-      seen.set(`t:${task.id}`, key);
-      void savePairTask({ data: withOwner }).catch(() => undefined);
-    }
-  }, [tasks, seen, myUserId, partnerUserId]);
+    let stop = false;
+    const run = async () => {
+      for (const task of tasks) {
+        const withOwner = {
+          ...task,
+          ownerUserId:
+            task.ownerUserId ??
+            (task.owner === "both" ? "both" : task.owner === "me" ? myUserId : task.owner === "partner" ? partnerUserId : null),
+        };
+        const key = withOwner.updatedAt ?? "";
+        if (seen.current.get(`t:${task.id}`) === key) continue;
+        seen.current.set(`t:${task.id}`, key);
+        const saved = await savePairTask({ data: withOwner }).catch(() => null);
+        if (stop || !saved?.updatedAt || saved.updatedAt === key) continue;
+        seen.current.set(`t:${task.id}`, saved.updatedAt);
+        useCouple.getState().replaceTaskMeta(task.id, { updatedAt: saved.updatedAt });
+      }
+    };
+    void run();
+    return () => {
+      stop = true;
+    };
+  }, [tasks, myUserId, partnerUserId]);
 
   useEffect(() => {
     let stop = false;
@@ -305,30 +350,28 @@ function AppShell() {
           ...wish,
           ownerUserId: wish.ownerUserId ?? (wish.owner === "me" ? myUserId : partnerUserId),
         };
-        const photo = await compressPhotoData(withOwner.photo);
+        const photo = withOwner.photo.startsWith("data:") ? await compressPhotoData(withOwner.photo) : withOwner.photo;
         const packed = packWish({ ...withOwner, photo });
-        const key = JSON.stringify({
-          t: packed.title,
-          o: packed.ownerUserId,
-          f: packed.fulfilled,
-          p: packed.price,
-          n: packed.note,
-          l: packed.link,
-          ph: packed.photo,
+        const key = `${packed.updatedAt ?? ""}|${packed.photoPath ?? ""}|${packed.photo.startsWith("data:") ? "data" : packed.photo}`;
+        if (seen.current.get(`w:${wish.id}`) === key) continue;
+        seen.current.set(`w:${wish.id}`, key);
+        const saved = await savePairWish({ data: packed }).catch(() => null);
+        if (stop || !saved) continue;
+        const savedKey = `${saved.updatedAt ?? ""}|${saved.photoPath ?? ""}|${saved.photo.startsWith("data:") ? "data" : saved.photo}`;
+        if (savedKey === key) continue;
+        seen.current.set(`w:${wish.id}`, savedKey);
+        useCouple.getState().replaceWishMeta(wish.id, {
+          photo: saved.photo,
+          photoPath: saved.photoPath,
+          updatedAt: saved.updatedAt,
         });
-        if (seen.get(`w:${wish.id}`) === key) continue;
-        seen.set(`w:${wish.id}`, key);
-        if (photo && photo !== wish.photo) {
-          useCouple.getState().updateWish(wish.id, { photo });
-        }
-        await savePairWish({ data: packed }).catch(() => undefined);
       }
     };
     void run();
     return () => {
       stop = true;
     };
-  }, [wishes, seen, myUserId, partnerUserId]);
+  }, [wishes, myUserId, partnerUserId]);
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col bg-bg">
@@ -340,8 +383,4 @@ function AppShell() {
       <TabBar />
     </main>
   );
-}
-
-export async function leaveCurrentPair() {
-  await leavePairRemote();
 }

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
-import { sbDelete, sbInsert, sbPatch, sbSelect, sbUpsert } from "@/lib/supabase-app";
+import { ensureMembership, membershipOf, type ProfileRow } from "@/lib/pair-access";
+import { assertSafeId, eqFilter, removeWishPhoto, sbDelete, sbInsert, sbPatch, sbSelect } from "@/lib/supabase-app";
 
 export type PairProfile = {
   userId: string;
@@ -9,133 +10,148 @@ export type PairProfile = {
   inviteCode: string;
   birthday: string | null;
   pairId: string | null;
+  seat: "a" | "b" | null;
   partner: {
     userId: string;
     displayName: string | null;
     inviteCode: string;
+    birthday: string | null;
   } | null;
 };
 
-type ProfileRow = {
-  user_id: string;
-  email: string | null;
-  display_name: string | null;
-  invite_code: string;
-  birthday: string | null;
-  pair_id: string | null;
-};
-
-type PairRow = {
-  id: string;
-  a_user_id: string;
-  b_user_id: string | null;
-};
-
-const ALPH = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-function makeCode() {
-  let out = "";
-  for (let i = 0; i < 6; i += 1) out += ALPH[Math.floor(Math.random() * ALPH.length)];
-  return out;
+function labelOf(row: ProfileRow) {
+  if (row.display_name && row.display_name !== row.email?.split("@")[0]) return row.display_name;
+  return row.display_name || row.email?.split("@")[0] || null;
 }
 
-async function uniqueCode() {
-  for (let i = 0; i < 12; i += 1) {
-    const code = makeCode();
-    const hit = await sbSelect<ProfileRow>("app_profiles", `invite_code=eq.${code}&select=user_id`);
-    if (!hit[0]) return code;
-  }
-  return `${makeCode()}${makeCode()}`.slice(0, 8);
-}
-
-async function loadProfile(userId: string): Promise<PairProfile | null> {
-  const rows = await sbSelect<ProfileRow>("app_profiles", `user_id=eq.${encodeURIComponent(userId)}&select=*`);
-  const me = rows[0];
-  if (!me) return null;
+async function profileView(userId: string): Promise<PairProfile> {
+  const me = await ensureMembership(userId);
   let partner: PairProfile["partner"] = null;
-  if (me.pair_id) {
-    const pair = (await sbSelect<PairRow>("app_pairs", `id=eq.${me.pair_id}&select=*`))[0];
-    const otherId = pair ? (pair.a_user_id === userId ? pair.b_user_id : pair.a_user_id) : null;
+  if (me.pair) {
+    const otherId = me.pair.a_user_id === userId ? me.pair.b_user_id : me.pair.a_user_id;
     if (otherId) {
-      const them = (await sbSelect<ProfileRow>("app_profiles", `user_id=eq.${encodeURIComponent(otherId)}&select=*`))[0];
+      const them = (await sbSelect<ProfileRow>("app_profiles", `${eqFilter("user_id", otherId)}&select=*`))[0];
       if (them) {
-        const label =
-          them.display_name && them.display_name !== them.email?.split("@")[0]
-            ? them.display_name
-            : them.display_name || them.email?.split("@")[0] || null;
-        partner = { userId: them.user_id, displayName: label, inviteCode: them.invite_code };
+        partner = {
+          userId: them.user_id,
+          displayName: labelOf(them),
+          inviteCode: them.invite_code,
+          birthday: them.birthday,
+        };
       }
     }
   }
   return {
-    userId: me.user_id,
-    email: me.email,
-    displayName: me.display_name,
-    inviteCode: me.invite_code,
-    birthday: me.birthday,
-    pairId: me.pair_id,
+    userId: me.profile.user_id,
+    email: me.profile.email,
+    displayName: me.profile.display_name,
+    inviteCode: me.profile.invite_code,
+    birthday: me.profile.birthday,
+    pairId: me.pairId,
+    seat: partner ? me.seat : null,
     partner,
   };
 }
 
-async function ensure(userId: string): Promise<PairProfile> {
-  const existing = await loadProfile(userId);
-  if (existing) return existing;
-  const code = await uniqueCode();
-  await sbInsert("app_profiles", { user_id: userId, invite_code: code });
-  return (await loadProfile(userId))!;
-}
-
 export const getMyPair = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
-  .handler(async ({ context }): Promise<PairProfile> => ensure(context.userId));
+  .handler(async ({ context }): Promise<PairProfile> => profileView(context.userId));
 
 export const saveMyProfile = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: { displayName?: string; birthday?: string; email?: string }) => input)
   .handler(async ({ context, data }): Promise<PairProfile> => {
-    await ensure(context.userId);
+    await ensureMembership(context.userId);
     const patch: Record<string, unknown> = {};
-    if (data.displayName) patch.display_name = data.displayName;
-    if (data.birthday) patch.birthday = data.birthday;
-    if (data.email) patch.email = data.email;
+    if (data.displayName) patch.display_name = data.displayName.slice(0, 80);
+    if (data.birthday) patch.birthday = data.birthday.slice(0, 32);
+    if (data.email) patch.email = data.email.slice(0, 200);
     if (Object.keys(patch).length) {
-      await sbPatch("app_profiles", `user_id=eq.${encodeURIComponent(context.userId)}`, patch);
+      await sbPatch("app_profiles", eqFilter("user_id", context.userId), patch);
     }
-    return (await loadProfile(context.userId))!;
+    return profileView(context.userId);
   });
 
 export const joinByInvite = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator((code: string) => code.trim().toUpperCase())
+  .validator((code: string) => {
+    const clean = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (clean.length < 4 || clean.length > 12) throw new Error("Короткий код");
+    return clean;
+  })
   .handler(async ({ context, data: code }): Promise<PairProfile> => {
-    if (code.length < 4) throw new Error("Короткий код");
-    const me = await ensure(context.userId);
+    const me = await ensureMembership(context.userId);
     if (me.pairId) throw new Error("Сначала выйди из своей пары");
-    const them = (await sbSelect<ProfileRow>("app_profiles", `invite_code=eq.${code}&select=*`))[0];
+    const them = (await sbSelect<ProfileRow>("app_profiles", `${eqFilter("invite_code", code)}&select=*`))[0];
     if (!them) throw new Error("Код не найден");
     if (them.user_id === context.userId) throw new Error("Это твой код");
+
     if (them.pair_id) {
-      const pair = (await sbSelect<PairRow>("app_pairs", `id=eq.${them.pair_id}&select=*`))[0];
-      if (!pair || pair.b_user_id) throw new Error("В этой паре уже двое");
-      await sbPatch("app_pairs", `id=eq.${pair.id}`, { b_user_id: context.userId });
-      await sbPatch("app_profiles", `user_id=eq.${encodeURIComponent(context.userId)}`, { pair_id: pair.id });
-      return (await loadProfile(context.userId))!;
+      const pairId = assertSafeId(them.pair_id);
+      const pair = (await sbSelect<{ a_user_id: string; b_user_id: string | null }>("app_pairs", `${eqFilter("id", pairId)}&select=a_user_id,b_user_id`))[0];
+      if (!pair || pair.a_user_id !== them.user_id || pair.b_user_id) throw new Error("В этой паре уже двое");
+      const claimed = await sbPatch("app_pairs", `${eqFilter("id", pairId)}&b_user_id=is.null&${eqFilter("a_user_id", them.user_id)}`, {
+        b_user_id: context.userId,
+      });
+      if (!claimed.length) throw new Error("В этой паре уже двое");
+      const linked = await sbPatch("app_profiles", `${eqFilter("user_id", context.userId)}&pair_id=is.null`, {
+        pair_id: pairId,
+      });
+      if (!linked.length) {
+        await sbPatch("app_pairs", `${eqFilter("id", pairId)}&${eqFilter("b_user_id", context.userId)}`, {
+          b_user_id: null,
+        });
+        throw new Error("Сначала выйди из своей пары");
+      }
+      return profileView(context.userId);
     }
+
     const pairId = crypto.randomUUID();
-    await sbInsert("app_pairs", { id: pairId, a_user_id: them.user_id, b_user_id: context.userId });
-    await sbPatch("app_profiles", `user_id=eq.${encodeURIComponent(them.user_id)}`, { pair_id: pairId });
-    await sbPatch("app_profiles", `user_id=eq.${encodeURIComponent(context.userId)}`, { pair_id: pairId });
-    return (await loadProfile(context.userId))!;
+    try {
+      await sbInsert("app_pairs", { id: pairId, a_user_id: them.user_id, b_user_id: context.userId });
+    } catch {
+      const again = await membershipOf(them.user_id);
+      if (again?.pairId) throw new Error("В этой паре уже двое");
+      throw new Error("Не вышло соединиться");
+    }
+    const linkedThem = await sbPatch("app_profiles", `${eqFilter("user_id", them.user_id)}&pair_id=is.null`, {
+      pair_id: pairId,
+    });
+    if (!linkedThem.length) {
+      await sbDelete("app_pairs", eqFilter("id", pairId));
+      throw new Error("В этой паре уже двое");
+    }
+    const linkedMe = await sbPatch("app_profiles", `${eqFilter("user_id", context.userId)}&pair_id=is.null`, {
+      pair_id: pairId,
+    });
+    if (!linkedMe.length) {
+      await sbPatch("app_profiles", `${eqFilter("user_id", them.user_id)}&${eqFilter("pair_id", pairId)}`, {
+        pair_id: null,
+      });
+      await sbDelete("app_pairs", eqFilter("id", pairId));
+      throw new Error("Сначала выйди из своей пары");
+    }
+    return profileView(context.userId);
   });
 
 export const leavePairRemote = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .handler(async ({ context }): Promise<PairProfile> => {
-    const me = await ensure(context.userId);
-    if (me.pairId) {
-      await sbPatch("app_profiles", `pair_id=eq.${me.pairId}`, { pair_id: null });
-      await sbDelete("app_pairs", `id=eq.${me.pairId}`);
+    const me = await ensureMembership(context.userId);
+    const pairId = me.pairId;
+    if (!pairId) return profileView(context.userId);
+    const wishes = await sbSelect<{ photo_path: string | null }>(
+      "app_wishes",
+      `${eqFilter("pair_id", pairId)}&select=photo_path`,
+    );
+    await sbPatch("app_profiles", eqFilter("pair_id", pairId), { pair_id: null });
+    await sbDelete("app_tasks", eqFilter("pair_id", pairId));
+    await sbDelete("app_wishes", eqFilter("pair_id", pairId));
+    for (const wish of wishes) {
+      if (wish.photo_path?.startsWith(`${pairId}/`)) await removeWishPhoto(wish.photo_path);
     }
-    return (await loadProfile(context.userId))!;
+    await sbDelete("app_pairs", eqFilter("id", pairId));
+    await sbDelete("app_tasks", eqFilter("pair_id", pairId));
+    await sbDelete("app_wishes", eqFilter("pair_id", pairId));
+    return profileView(context.userId);
   });
