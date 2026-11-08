@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
+import { format } from "date-fns";
 import { ru } from "date-fns/locale";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { BirthdayPicker } from "@/components/birthday-picker";
 import {
   CalendarScreen,
   ListsScreen,
@@ -244,67 +244,8 @@ function InviteScreen({
       >
         Соединиться
       </button>
-      {pick ? <BirthdaySheet value={birthday} onPick={setBirthday} onClose={() => setPick(false)} /> : null}
+      {pick ? <BirthdayPicker value={birthday} onPick={setBirthday} onClose={() => setPick(false)} /> : null}
     </main>
-  );
-}
-
-function BirthdaySheet({
-  value,
-  onPick,
-  onClose,
-}: {
-  value: string;
-  onPick: (iso: string) => void;
-  onClose: () => void;
-}) {
-  const initial = value ? new Date(`${value}T12:00:00`) : new Date();
-  const [cursor, setCursor] = useState(startOfMonth(initial));
-  const days = eachDayOfInterval({
-    start: startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 }),
-    end: endOfWeek(endOfMonth(cursor), { weekStartsOn: 1 }),
-  });
-
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-end bg-black/55" onClick={onClose}>
-      <div className="w-full max-w-md rounded-t-3xl bg-bg px-5 pt-4 pb-8" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-3 flex items-center justify-between">
-          <button type="button" onClick={() => setCursor(addMonths(cursor, -1))} className="grid size-10 place-items-center">
-            <ChevronLeft className="size-5" />
-          </button>
-          <p className="capitalize">{format(cursor, "LLLL yyyy", { locale: ru })}</p>
-          <button type="button" onClick={() => setCursor(addMonths(cursor, 1))} className="grid size-10 place-items-center">
-            <ChevronRight className="size-5" />
-          </button>
-        </div>
-        <div className="grid grid-cols-7 gap-y-1 text-center text-[12px] text-muted">
-          {["пн", "вт", "ср", "чт", "пт", "сб", "вс"].map((d) => (
-            <span key={d}>{d}</span>
-          ))}
-        </div>
-        <div className="mt-2 grid grid-cols-7 gap-y-1 text-center">
-          {days.map((day) => {
-            const key = format(day, "yyyy-MM-dd");
-            const picked = key === value;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => onPick(key)}
-                className={`mx-auto grid size-10 place-items-center rounded-full text-[15px] ${
-                  picked ? "bg-cream text-cream-fg" : isSameMonth(day, cursor) ? "text-fg" : "text-muted/35"
-                }`}
-              >
-                {format(day, "d")}
-              </button>
-            );
-          })}
-        </div>
-        <button type="button" onClick={onClose} className="mt-4 w-full py-3 text-muted">
-          Закрыть
-        </button>
-      </div>
-    </div>
   );
 }
 

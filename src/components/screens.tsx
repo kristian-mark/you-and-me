@@ -48,6 +48,7 @@ import { BudgetScreen } from "@/components/budget-screen";
 import { GamesScreen } from "@/components/games-screen";
 import { NewTaskSheet } from "@/components/new-task-sheet";
 import { NewWishSheet } from "@/components/new-wish-sheet";
+import { BirthdayPicker } from "@/components/birthday-picker";
 import { EmptyState, ScreenHeader, UsBadge } from "@/components/ui/shell";
 import { WishPhoto } from "@/components/wish-photo";
 import { useCouple, viewedOwner, viewedWishOwner, type CheckList, type Task, type TaskOwner, type Wish } from "@/lib/couple-store";
@@ -1694,6 +1695,7 @@ function BirthdayField({
 }) {
   const [draft, setDraft] = useState(value);
   const [msg, setMsg] = useState("");
+  const [open, setOpen] = useState(false);
   const shown = draft
     ? format(parseISO(draft), "d MMMM yyyy", { locale: ru })
     : "Выбрать дату";
@@ -1701,25 +1703,27 @@ function BirthdayField({
   return (
     <div className="mt-3 rounded-[22px] bg-raised px-5 py-5">
       <p className="text-[13px] text-muted">{label}</p>
-      <label className="relative mt-3 block">
-        <div
-          className={`rounded-2xl bg-chip px-4 py-3.5 text-[16px] ${
-            draft ? "text-fg" : "text-muted"
-          } ${locked ? "opacity-60" : ""}`}
-        >
-          {shown}
-        </div>
-        <input
-          type="date"
+      <button
+        type="button"
+        disabled={locked}
+        onClick={() => setOpen(true)}
+        className={`mt-3 flex w-full items-center justify-between rounded-2xl bg-chip px-4 py-3.5 text-left text-[16px] ${
+          draft ? "text-fg" : "text-muted"
+        } ${locked ? "opacity-60" : ""}`}
+      >
+        <span className="capitalize">{shown}</span>
+        {locked ? null : <span className="text-muted">›</span>}
+      </button>
+      {open && !locked ? (
+        <BirthdayPicker
           value={draft}
-          disabled={locked}
-          onChange={(e) => {
-            setDraft(e.target.value);
+          onPick={(iso) => {
+            setDraft(iso);
             setMsg("");
           }}
-          className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-default"
+          onClose={() => setOpen(false)}
         />
-      </label>
+      ) : null}
       <p className="mt-2 text-[13px] leading-5 text-muted">{hint}</p>
       {locked ? null : (
         <button
