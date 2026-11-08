@@ -4,6 +4,8 @@ import { ru } from "date-fns/locale";
 import { Cake, Gift } from "lucide-react";
 import { WishPhoto } from "@/components/wish-photo";
 import { useCouple, viewedWishOwner, type Wish } from "@/lib/couple-store";
+import { refreshPairWishes } from "@/lib/pair-live";
+import { LIST_POLL_MS, useScreenPoll } from "@/lib/screen-poll";
 
 function nextBirthday(iso: string, from = new Date()) {
   const src = new Date(iso);
@@ -35,6 +37,7 @@ function formatWishPrice(price: string, currency?: string) {
 }
 
 export function GiftRadarScreen({ onBack }: { onBack: () => void }) {
+  useScreenPoll("wishes", true, LIST_POLL_MS, refreshPairWishes);
   const partnerName = useCouple((s) => s.partnerName);
   const partnerBirthday = useCouple((s) => s.partnerBirthday);
   const wishes = useCouple((s) => s.wishes);

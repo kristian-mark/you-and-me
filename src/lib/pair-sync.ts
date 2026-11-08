@@ -46,3 +46,18 @@ export function mergeSynced<T extends SyncRow>(local: T[], remote: T[], deletedI
 
   return { next, upload, retryDelete, forget: [...forget] };
 }
+
+/**
+ * What a poll may do with a list. Remote rows are in `mark` so the caller can
+ * remember them and not write them back. Newer local edits stay out of `mark`.
+ * There is no upload and no delete retry here.
+ */
+export function planRemoteSync<T extends SyncRow>(local: T[], remote: T[], deletedIds: string[]) {
+  const merged = mergeSynced(local, remote, deletedIds);
+  const keepLocal = new Set(merged.upload.map((row) => row.id));
+  return {
+    next: merged.next.filter((row) => !row.deleted),
+    mark: merged.next.filter((row) => !row.deleted && !keepLocal.has(row.id)),
+    forget: merged.forget,
+  };
+}
