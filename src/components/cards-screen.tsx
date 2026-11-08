@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { UsBadge } from "@/components/ui/shell";
-import { useCouple, type CardKind, type LoyaltyCard } from "@/lib/couple-store";
+import { useCouple, usePlayerColors, type CardKind, type LoyaltyCard } from "@/lib/couple-store";
+import { pieceBg } from "@/lib/pair-color";
 import { code128Pattern, ean13Pattern, patternToBars, qrGrid } from "@/lib/card-codes";
 
 const COLORS = ["#3f8f46", "#d46a5c", "#5b7fc7", "#d4a017", "#2aa8a8", "#9b6bb8"];
@@ -189,6 +190,7 @@ function CardRow({
 }) {
   const timer = useRef(0);
   const held = useRef(false);
+  const colors = usePlayerColors();
   const clear = () => window.clearTimeout(timer.current);
   return (
     <button
@@ -220,7 +222,7 @@ function CardRow({
           {formatNumber(card.number) || "—"}
         </span>
       </span>
-      <span className={`mt-1 size-3.5 rounded-full ${card.owner === "me" ? "bg-blue" : "bg-pink"}`} />
+      <span className={`mt-1 size-3.5 rounded-full ${pieceBg(card.owner === "me" ? colors.me : colors.partner)}`} />
     </button>
   );
 }
@@ -510,6 +512,7 @@ function CardForm({
 
 function CardDetail({ card, onBack }: { card: LoyaltyCard; onBack: () => void }) {
   const [qr, setQr] = useState(card.kind === "qr");
+  const colors = usePlayerColors();
   const kindLabel = KINDS.find((k) => k.id === card.kind)?.label ?? "Code-128";
   const groups = formatNumber(card.number).split(" ").filter(Boolean);
   const mid = Math.max(1, Math.ceil(groups.length / 2));
@@ -546,7 +549,7 @@ function CardDetail({ card, onBack }: { card: LoyaltyCard; onBack: () => void })
       <div className="flex flex-1 flex-col items-center pt-10">
         <h1 className="text-center text-[34px] font-semibold tracking-tight">{card.title}</h1>
         <p className="mt-3 flex items-center gap-2 text-[15px] text-[#8b8b92]">
-          <span className={`size-3 rounded-full ${card.owner === "me" ? "bg-blue" : "bg-pink"}`} />
+          <span className={`size-3 rounded-full ${pieceBg(card.owner === "me" ? colors.me : colors.partner)}`} />
           {card.owner === "me" ? "Ты" : "Партнёр"} · {kindLabel}
         </p>
 

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Camera, ChevronLeft, ChevronRight, Eye, Lock, Shield, Sparkles, X } from "lucide-react";
-import { useCouple, viewedWishOwner, type Person } from "@/lib/couple-store";
+import { useCouple, usePlayerColors, viewedWishOwner, type Person } from "@/lib/couple-store";
+import { pieceBg } from "@/lib/pair-color";
 import { leaveSharedPair } from "@/lib/leave-pair";
 import { refreshPairTasks, refreshPairWishes } from "@/lib/pair-live";
 import { LIST_POLL_MS, useScreenPoll } from "@/lib/screen-poll";
@@ -36,6 +37,7 @@ export function UsScreen({ onClose }: { onClose: () => void }) {
   const tasks = useCouple((s) => s.tasks);
   const notes = useCouple((s) => s.notes);
   const [page, setPage] = useState<"hub" | "settings" | "year">("hub");
+  const colors = usePlayerColors();
   const year = new Date().getFullYear();
 
   const stats = useMemo(() => (together ? anniversaryCountdown(together) : null), [together]);
@@ -61,8 +63,8 @@ export function UsScreen({ onClose }: { onClose: () => void }) {
         <h1 className="text-[34px] font-semibold tracking-tight">Мы</h1>
         <div className="flex items-center gap-2">
           <span className="relative h-5 w-8">
-            <span className="absolute left-0 top-0.5 size-4 rounded-full bg-blue" />
-            <span className="absolute right-0 top-0.5 size-4 rounded-full bg-pink" />
+            <span className={`absolute left-0 top-0.5 size-4 rounded-full ${pieceBg(colors.me)}`} />
+            <span className={`absolute right-0 top-0.5 size-4 rounded-full ${pieceBg(colors.partner)}`} />
           </span>
           <button type="button" onClick={onClose} className="grid size-11 place-items-center rounded-full bg-raised" aria-label="Закрыть">
             <X className="size-5" />
@@ -276,6 +278,7 @@ function CoupleSettings({ onBack }: { onBack: () => void }) {
   const people = useCouple((s) => s.people);
   const anniversary = useCouple((s) => s.anniversaryDate);
   const together = togetherDay(anniversary, pairedAt);
+  const colors = usePlayerColors();
   const [page, setPage] = useState<"hub" | "people" | "dates" | "leave" | "name">("hub");
   if (page === "people") return <PeopleScreen onBack={() => setPage("hub")} />;
   if (page === "dates") return <DatesScreen onBack={() => setPage("hub")} />;
@@ -299,7 +302,7 @@ function CoupleSettings({ onBack }: { onBack: () => void }) {
 
       <div className="mt-5 overflow-hidden rounded-[24px] bg-raised px-4">
         <div className="flex items-center gap-3 py-4">
-          <span className="size-14 shrink-0 rounded-full bg-blue" />
+          <span className={`size-14 shrink-0 rounded-full ${pieceBg(colors.me)}`} />
           <div className="min-w-0 flex-1">
             <p className="text-[17px] leading-5">{first}</p>
             {rest ? <p className="text-[17px] leading-5">{rest}</p> : null}
@@ -310,7 +313,7 @@ function CoupleSettings({ onBack }: { onBack: () => void }) {
           </button>
         </div>
         <div className="flex items-center gap-3 border-t border-line py-4">
-          <span className="size-14 shrink-0 rounded-full bg-pink" />
+          <span className={`size-14 shrink-0 rounded-full ${pieceBg(colors.partner)}`} />
           <div>
             <p className="text-[17px]">{partnerName}</p>
             <p className="mt-1 text-[13px] text-[#e6e1d6]">{joinedLabel}</p>

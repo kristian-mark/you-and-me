@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { ensureMembership, membershipOf, type ProfileRow } from "@/lib/pair-access";
+import { parsePieceColor, type PieceColor } from "@/lib/pair-color";
 import { assertSafeId, eqFilter, removeWishPhoto, sbDelete, sbInsert, sbPatch, sbSelect } from "@/lib/supabase-app";
 import { deleteCoupleGames } from "@/lib/turn/server";
 
@@ -10,6 +11,7 @@ export type PairProfile = {
   displayName: string | null;
   inviteCode: string;
   birthday: string | null;
+  color: PieceColor | null;
   pairId: string | null;
   seat: "a" | "b" | null;
   togetherSince: string | null;
@@ -19,6 +21,7 @@ export type PairProfile = {
     displayName: string | null;
     inviteCode: string;
     birthday: string | null;
+    color: PieceColor | null;
   } | null;
 };
 
@@ -48,6 +51,7 @@ async function profileView(userId: string): Promise<PairProfile> {
           displayName: labelOf(them),
           inviteCode: them.invite_code,
           birthday: them.birthday,
+          color: parsePieceColor(them.color),
         };
       }
     }
@@ -58,6 +62,7 @@ async function profileView(userId: string): Promise<PairProfile> {
     displayName: labelOf(me.profile),
     inviteCode: me.profile.invite_code,
     birthday: me.profile.birthday,
+    color: parsePieceColor(me.profile.color),
     pairId: me.pairId,
     seat: partner ? me.seat : null,
     togetherSince: dayOf(me.pair?.together_since),
@@ -72,13 +77,19 @@ export const getMyPair = createServerFn({ method: "GET" })
 
 export const saveMyProfile = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator((input: { displayName?: string; birthday?: string; email?: string }) => input)
+  .validator((input: { displayName?: string; birthday?: string; email?: string; color?: string }) => {
+    if (input.color !== undefined && input.color !== "blue" && input.color !== "pink") {
+      throw new Error("Некорректный цвет");
+    }
+    return input;
+  })
   .handler(async ({ context, data }): Promise<PairProfile> => {
     await ensureMembership(context.userId);
     const patch: Record<string, unknown> = {};
     if (data.displayName) patch.display_name = data.displayName.slice(0, 80);
     if (data.birthday) patch.birthday = data.birthday.slice(0, 32);
     if (data.email) patch.email = data.email.slice(0, 200);
+    if (data.color === "blue" || data.color === "pink") patch.color = data.color;
     if (Object.keys(patch).length) {
       await sbPatch("app_profiles", eqFilter("user_id", context.userId), patch);
     }

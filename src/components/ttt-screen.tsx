@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CircleHelp } from "lucide-react";
-import { useCouple } from "@/lib/couple-store";
+import { useCouple, usePlayerColors } from "@/lib/couple-store";
+import { pieceBorder, pieceText, type PieceColor } from "@/lib/pair-color";
 import { GAME_POLL_MS, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 import { loadTttMatch, openNewTttMatch, playTttMove } from "@/lib/turn/server";
 import { tttBanner, type TttMatchView } from "@/lib/turn/ttt";
@@ -19,9 +20,9 @@ function textOf(error: unknown) {
   return "Не вышло связаться с партией";
 }
 
-function Cross({ tone }: { tone: "me" | "partner" }) {
+function Cross({ tone }: { tone: PieceColor }) {
   return (
-    <svg viewBox="0 0 48 48" className={`size-[46%] ${tone === "me" ? "text-blue" : "text-pink"}`} aria-hidden="true">
+    <svg viewBox="0 0 48 48" className={`size-[46%] ${pieceText(tone)}`} aria-hidden="true">
       <path
         d="M14 14 L34 34 M34 14 L14 34"
         fill="none"
@@ -33,21 +34,18 @@ function Cross({ tone }: { tone: "me" | "partner" }) {
   );
 }
 
-function Nought({ tone }: { tone: "me" | "partner" }) {
-  return (
-    <span
-      className={`size-[42%] rounded-full border-[3px] ${tone === "me" ? "border-blue" : "border-pink"}`}
-    />
-  );
+function Nought({ tone }: { tone: PieceColor }) {
+  return <span className={`size-[42%] rounded-full border-[3px] ${pieceBorder(tone)}`} />;
 }
 
-function Mark({ cross, tone }: { cross: boolean; tone: "me" | "partner" }) {
+function Mark({ cross, tone }: { cross: boolean; tone: PieceColor }) {
   return cross ? <Cross tone={tone} /> : <Nought tone={tone} />;
 }
 
 export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void }) {
   const myName = useCouple((s) => s.myName);
   const partnerName = useCouple((s) => s.partnerName);
+  const colors = usePlayerColors();
   const noteTtt = useCouple((s) => s.noteTtt);
   const [view, setView] = useState<TttMatchView | null>(null);
   const [notice, setNotice] = useState("");
@@ -96,7 +94,26 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
       .catch((error: unknown) => {
         setNotice(textOf(error));
         return loadTttMatch()
-          .then(take)
+          .then((next) => setView(next))
+          .catch(() => undefined);
+      })
+      .finally(() => {
+        busy.current = false;
+        setPending(false);
+      });
+  };
+
+  const onStart = () => {
+    if (busy.current || !view || view.status === "active") return;
+    busy.current = true;
+    setPending(true);
+    setNotice("");
+    void openNewTttMatch({ data: { version: view.version } })
+      .then((next) => setView(next))
+      .catch((error: unknown) => {
+        setNotice(textOf(error));
+        return loadTttMatch()
+          .then((next) => setView(next))
           .catch(() => undefined);
       })
       .finally(() => {
@@ -117,7 +134,7 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
       .catch((error: unknown) => {
         setNotice(textOf(error));
         return loadTttMatch()
-          .then(take)
+          .then((next) => setView(next))
           .catch(() => undefined);
       })
       .finally(() => {
@@ -160,8 +177,8 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="mt-2 grid shrink-0 grid-cols-2 gap-2">
-              <PlayerCard name={myName} mark={markLabel(true)} active={view.myTurn && view.status !== "finished"} tone="blue" />
-              <PlayerCard name={partnerName} mark={markLabel(false)} active={!view.myTurn && view.status === "active"} tone="pink" />
+              <PlayerCard name={myName} mark={markLabel(true)} active={view.myTurn && view.status !== "finished"} tone={colors.me} />
+              <PlayerCard name={partnerName} mark={markLabel(false)} active={!view.myTurn && view.status === "active"} tone={colors.partner} />
             </div>
 
             <div className="mt-2 shrink-0 text-center" aria-live="polite">
@@ -176,7 +193,7 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
               <div className="grid aspect-square grid-cols-3 gap-2 sm:gap-3" style={{ width: "min(100cqw, 100cqh, 34rem)" }}>
                 {view.board.map((cell, index) => {
                   const win = view.winningLine?.includes(index);
-                  const tone: "me" | "partner" = cell === "partner" ? "partner" : "me";
+                  const tone = cell === "partner" ? colors.partner : colors.me;
                   const cross =
                     cell === null || view.youAreCrosses === null ? false : cell === "me" ? view.youAreCrosses : !view.youAreCrosses;
                   const label =
@@ -198,7 +215,7 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
             </div>
 
             <div className="mt-2 flex shrink-0 items-center gap-3 rounded-[22px] bg-raised px-4 py-2.5">
-              <span className="size-3 shrink-0 rounded-full bg-blue" />
+              <span className={`size-3 shrink-0 rounded-full ${colors.me === "blue" ? "bg-blue" : "bg-pink"}`} />
               <span className="min-w-0 flex-1 truncate text-[15px]">{myName}</span>
               <span className="text-[20px] font-semibold tracking-wide">
                 {view.wins.me}
@@ -206,11 +223,16 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
                 {view.wins.partner}
               </span>
               <span className="min-w-0 flex-1 truncate text-right text-[15px]">{partnerName}</span>
-              <span className="size-3 shrink-0 rounded-full bg-pink" />
+              <span className={`size-3 shrink-0 rounded-full ${colors.partner === "blue" ? "bg-blue" : "bg-pink"}`} />
             </div>
             {view.draws > 0 ? <p className="mt-1 shrink-0 text-center text-[13px] text-[#e6e1d6]">Ничьих: {view.draws}</p> : null}
             {notice ? <p className="mt-1 shrink-0 text-center text-[14px] text-pink">{notice}</p> : null}
 
+            {view.status === "idle" ? (
+              <button type="button" onClick={onStart} disabled={pending} className="mt-2 min-h-11 shrink-0 rounded-full bg-cream text-[16px] font-semibold text-cream-fg disabled:opacity-60">
+                Начать игру
+              </button>
+            ) : null}
             {view.status === "finished" ? (
               <div className="mt-2 grid shrink-0 grid-cols-2 gap-2">
                 <button type="button" onClick={onBack} className="min-h-11 rounded-full border border-line text-[16px] font-semibold">
@@ -236,9 +258,9 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
           >
             <p id="ttt-help-title" className="text-[20px] font-semibold">Как играть</p>
             <p className="mt-3 text-[16px] leading-6 text-[#e6e1d6]">
-              Если партии нет, любой из вас нажимает клетку и ходит первым — крестиками. Дальше только по очереди: свой ход
-              нельзя повторить, пока не сходит партнёр. Быть онлайн одновременно не нужно — партия хранится у вас двоих.
-              После победы, поражения или ничьей нажмите «Новая игра»: снова кто первый нажмёт клетку, тот и начинает.
+              Кто нажимает «Начать» или «Новая игра», тот ходит первым — крестиками. Второй не может поставить фишку раньше.
+              Дальше только по очереди. Быть онлайн одновременно не нужно — партия хранится у вас двоих.
+              Цвет фишки — ваш, один и тот же на обоих телефонах.
             </p>
             <button type="button" onClick={() => setHelp(false)} className="mt-5 min-h-11 w-full rounded-full bg-cream font-semibold text-cream-fg">
               Понятно
@@ -259,10 +281,10 @@ function PlayerCard({
   name: string;
   mark: string;
   active: boolean;
-  tone: "blue" | "pink";
+  tone: PieceColor;
 }) {
   return (
-    <div className={`min-w-0 rounded-[18px] border-2 bg-raised px-3 py-2 ${active ? (tone === "blue" ? "border-blue" : "border-pink") : "border-transparent"}`}>
+    <div className={`min-w-0 rounded-[18px] border-2 bg-raised px-3 py-2 ${active ? pieceBorder(tone) : "border-transparent"}`}>
       <div className="flex items-center gap-2">
         <span className={`size-8 shrink-0 rounded-full ${tone === "blue" ? "bg-blue" : "bg-pink"}`} />
         <div className="min-w-0">

@@ -52,7 +52,8 @@ import {
   PartyPopper,
 } from "lucide-react";
 import { UsBadge } from "@/components/ui/shell";
-import { useCouple, type BudgetAccount, type BudgetCategory, type BudgetTx, type RecurringPayment } from "@/lib/couple-store";
+import { useCouple, usePlayerColors, type BudgetAccount, type BudgetCategory, type BudgetTx, type RecurringPayment } from "@/lib/couple-store";
+import { pieceBg } from "@/lib/pair-color";
 
 const MONTHS = [
   "Январь","Февраль","Март","Апрель","Май","Июнь",
@@ -764,6 +765,15 @@ function RowLabel({ left, right, onRight }: { left: string; right: string; onRig
   );
 }
 
+function PayerDot({ who }: { who: "me" | "partner" }) {
+  const colors = usePlayerColors();
+  return (
+    <span
+      className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full ${pieceBg(who === "me" ? colors.me : colors.partner)}`}
+    />
+  );
+}
+
 function TxRow({ t, cats, main }: { t: BudgetTx; cats: BudgetCategory[]; main: string }) {
   const cat = cats.find((c) => c.id === t.categoryId);
   const Icon = ICONS[cat?.icon ?? "more"] ?? MoreHorizontal;
@@ -771,9 +781,7 @@ function TxRow({ t, cats, main }: { t: BudgetTx; cats: BudgetCategory[]; main: s
     <li className="flex items-center gap-3 rounded-[22px] bg-raised px-3 py-3">
       <span className="relative grid size-11 place-items-center rounded-xl" style={{ background: cat?.color }}>
         <Icon className="size-5 text-white" />
-        <span
-          className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full ${t.paidBy === "me" ? "bg-blue" : "bg-pink"}`}
-        />
+        <PayerDot who={t.paidBy} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[16px]">{t.note || cat?.title}</span>
@@ -870,9 +878,7 @@ function AllTxs({
                   <li key={t.id} className={`flex items-center gap-3 px-3 py-3 ${i ? "border-t border-line" : ""}`}>
                     <span className="relative grid size-11 place-items-center rounded-xl" style={{ background: cat?.color }}>
                       <Icon className="size-5 text-white" />
-                      <span
-                        className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full ${t.paidBy === "me" ? "bg-blue" : "bg-pink"}`}
-                      />
+                      <PayerDot who={t.paidBy} />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[16px]">{t.note || cat?.title}</span>
@@ -1728,9 +1734,7 @@ function CategorySpends({
           <li key={t.id} className="flex items-center gap-3 rounded-[22px] bg-raised px-3 py-3">
             <span className="relative grid size-11 place-items-center rounded-xl" style={{ background: color }}>
               <Icon className="size-5" style={{ color: accent }} />
-              <span
-                className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full ${t.paidBy === "me" ? "bg-blue" : "bg-pink"}`}
-              />
+              <PayerDot who={t.paidBy} />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[16px]">{t.note || title}</span>

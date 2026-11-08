@@ -11,7 +11,7 @@ import {
 } from "@/components/screens";
 import { TabBar } from "@/components/ui/shell";
 import { RedirectToSignIn } from "@/lib/auth/gates";
-import { authEnabled } from "@/lib/auth/client";
+import { authEnabled, signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { useCouple } from "@/lib/couple-store";
 import { compressPhotoData } from "@/lib/compress-photo";
@@ -97,6 +97,8 @@ function PairGate() {
         inviteCode: next.inviteCode,
         myBirthday: next.birthday,
         partnerBirthday: next.partner?.birthday ?? null,
+        myColor: next.color,
+        partnerColor: next.partner?.color ?? null,
       });
       const storedPair = useCouple.getState().pairCode ?? "";
       const storedServerPair = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storedPair);
@@ -111,6 +113,7 @@ function PairGate() {
       const raw = err instanceof Error ? err.message : "Облако не ответило";
       if (/unauthor/i.test(raw)) {
         setNeedsLogin(true);
+        if (authEnabled) void signOut("/login").catch(() => undefined);
         return;
       }
       setError(raw);

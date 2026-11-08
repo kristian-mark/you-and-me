@@ -12,6 +12,7 @@ import {
 } from "./engine.ts";
 import { turnGames } from "./registry.ts";
 import {
+  beginTtt,
   emptyTttState,
   idleTttView,
   newTttMatch,
@@ -151,14 +152,29 @@ async function loadMatch(userId: string): Promise<TttMatchView> {
 async function playMove(userId: string, cell: number, version: number): Promise<TttMatchView> {
   const { pair, pairId, seat } = await requirePair(userId);
   const row = await loadRow(pairId);
+  if (!row?.turn_user_id) throw new TurnRuleError("turn", "Сначала начни игру");
+  if (row.turn_user_id !== userId) throw new TurnRuleError("turn", "Сейчас ход партнёра");
+  const current = toSnapshot(row, pair);
+  if (current.version !== version) throw new TurnConflictError();
+  const step = turnGames.ttt.apply(current.snapshot, seat, { cell });
+  const now = new Date().toISOString();
+  const saved = await compareAndSwap(
+    pairId,
+    current.version,
+    `status=eq.active&${eqFilter("turn_user_id", userId)}`,
+    fields(pair, step, current.version + 1, now),
+  );
+  if (!saved) throw new TurnConflictError();
+  return viewOf(step, current.version + 1, seat, saved.updated_at ?? now);
+}
+
+async function openMatch(userId: string, version: number): Promise<TttMatchView> {
+  const { pair, pairId, seat } = await requirePair(userId);
+  const row = await loadRow(pairId);
   const now = new Date().toISOString();
   if (!row) {
     if (version !== 0) throw new TurnConflictError();
-    const step = turnGames.ttt.apply(
-      { state: emptyTttState(), status: "idle", turn: null, winner: null },
-      seat,
-      { cell },
-    );
+    const step = beginTtt(emptyTttState(), seat);
     try {
       await sbInsert("app_games", {
         pair_id: pairId,
@@ -174,44 +190,17 @@ async function playMove(userId: string, cell: number, version: number): Promise<
   }
   const current = toSnapshot(row, pair);
   if (current.version !== version) throw new TurnConflictError();
-  const step = turnGames.ttt.apply(current.snapshot, seat, { cell });
-  const guard =
-    current.snapshot.status === "idle"
-      ? "status=eq.idle"
-      : `status=eq.active&${eqFilter("turn_user_id", userId)}`;
+  if (current.snapshot.status === "active") {
+    return presentTtt(current.snapshot, current.version, seat, row.updated_at ?? null);
+  }
+  const previous =
+    current.snapshot.status === "finished" ? newTttMatch(current.snapshot.state) : current.snapshot.state;
+  const step = beginTtt(previous, seat);
+  const guard = current.snapshot.status === "finished" ? "status=eq.finished" : "status=eq.idle&turn_user_id=is.null";
   const saved = await compareAndSwap(
     pairId,
     current.version,
     guard,
-    fields(pair, step, current.version + 1, now),
-  );
-  if (!saved) throw new TurnConflictError();
-  return viewOf(step, current.version + 1, seat, saved.updated_at ?? now);
-}
-
-async function openMatch(userId: string, version: number): Promise<TttMatchView> {
-  const { pair, pairId, seat } = await requirePair(userId);
-  const row = await loadRow(pairId);
-  if (!row) return idleTttView();
-  const current = toSnapshot(row, pair);
-  if (current.version !== version) throw new TurnConflictError();
-  if (current.snapshot.status === "idle") {
-    return presentTtt(current.snapshot, current.version, seat, row.updated_at ?? null);
-  }
-  if (current.snapshot.status !== "finished") {
-    throw new TurnRuleError("illegal", "Новая игра начнётся после конца партии");
-  }
-  const step: TurnStep<TttState> = {
-    state: newTttMatch(current.snapshot.state),
-    status: "idle",
-    turn: null,
-    winner: null,
-  };
-  const now = new Date().toISOString();
-  const saved = await compareAndSwap(
-    pairId,
-    current.version,
-    "status=eq.finished",
     fields(pair, step, current.version + 1, now),
   );
   if (!saved) throw new TurnConflictError();

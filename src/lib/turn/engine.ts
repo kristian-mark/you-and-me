@@ -52,7 +52,7 @@ export function otherSeat(seat: Seat): Seat {
 }
 
 /**
- * Idle: either partner may open the match with their move.
+ * Idle: nobody moves until the match is started and a turn is stored.
  * Active: only the seat stored as `turn` may move.
  * Finished: nobody moves until the match is reset.
  */
@@ -60,8 +60,7 @@ export function assertCanAct(snapshot: { status: GameStatus; turn: Seat | null }
   if (snapshot.status === "finished") {
     throw new TurnRuleError("finished", "Партия уже закончена");
   }
-  if (snapshot.status === "idle") return;
-  if (snapshot.turn !== actor) {
+  if (snapshot.status !== "active" || snapshot.turn !== actor) {
     throw new TurnRuleError("turn", "Сейчас ход партнёра");
   }
 }

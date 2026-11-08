@@ -9,7 +9,8 @@ import {
   Reversi,
 } from "@/components/games-play";
 import { TicTacToe } from "@/components/ttt-screen";
-import { useCouple } from "@/lib/couple-store";
+import { useCouple, usePlayerColors } from "@/lib/couple-store";
+import { pieceBg } from "@/lib/pair-color";
 
 const GAMES = [
   { id: "ttt", title: "Крестики-нолики", icon: Hash, Screen: TicTacToe },
@@ -31,6 +32,7 @@ export function GamesScreen({ onBack }: { onBack: () => void }) {
   const myName = useCouple((s) => s.myName);
   const partnerName = useCouple((s) => s.partnerName);
   const wins = useCouple((s) => s.gameWins) ?? { me: 0, partner: 0 };
+  const colors = usePlayerColors();
   const [game, setGame] = useState<GameId | null>(null);
   const [round, setRound] = useState(0);
   const current = GAMES.find((item) => item.id === game);
@@ -48,9 +50,9 @@ export function GamesScreen({ onBack }: { onBack: () => void }) {
       <h1 className="mt-4 text-[40px] font-semibold tracking-tight">Игры</h1>
 
       <div className="mt-5 grid grid-cols-2 rounded-[28px] bg-raised px-4 py-4">
-        <Score name={myName} wins={wins.me} tone="bg-blue" />
+        <Score name={myName} wins={wins.me} tone={pieceBg(colors.me)} />
         <div className="border-l border-line pl-4">
-          <Score name={partnerName} wins={wins.partner} tone="bg-pink" />
+          <Score name={partnerName} wins={wins.partner} tone={pieceBg(colors.partner)} />
         </div>
       </div>
 

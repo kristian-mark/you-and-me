@@ -51,7 +51,8 @@ import { NewWishSheet } from "@/components/new-wish-sheet";
 import { BirthdayPicker } from "@/components/birthday-picker";
 import { EmptyState, ScreenHeader, UsBadge } from "@/components/ui/shell";
 import { WishPhoto } from "@/components/wish-photo";
-import { useCouple, viewedOwner, viewedWishOwner, type CheckList, type Task, type TaskOwner, type Wish } from "@/lib/couple-store";
+import { useCouple, usePlayerColors, viewedOwner, viewedWishOwner, type CheckList, type Task, type TaskOwner, type Wish } from "@/lib/couple-store";
+import { pieceBg, type PieceColor } from "@/lib/pair-color";
 import { leaveSharedPair } from "@/lib/leave-pair";
 import { refreshPairTasks, refreshPairWishes } from "@/lib/pair-live";
 import { deletePairTask } from "@/lib/pair-tasks";
@@ -589,9 +590,9 @@ function formatDue(date: string) {
   }
 }
 
-function dotClass(owner: TaskOwner | "free") {
-  if (owner === "me") return "bg-blue";
-  if (owner === "partner") return "bg-pink";
+function dotClass(owner: TaskOwner | "free", colors: { me: PieceColor; partner: PieceColor }) {
+  if (owner === "me") return pieceBg(colors.me);
+  if (owner === "partner") return pieceBg(colors.partner);
   if (owner === "both") return "bg-red";
   return "bg-cream";
 }
@@ -628,6 +629,7 @@ function Chip({
 
 export function CalendarScreen() {
   useScreenPoll("tasks", true, LIST_POLL_MS, refreshPairTasks);
+  const colors = usePlayerColors();
   const [cursor, setCursor] = useState(new Date());
   const [selected, setSelected] = useState(format(new Date(), "yyyy-MM-dd"));
   const [mode, setMode] = useState<"overview" | "month" | "week">("overview");
@@ -784,7 +786,7 @@ export function CalendarScreen() {
                   {dayTasks.map((item) => (
                     <span
                       key={item.id}
-                      className={`size-1 rounded-full ${dotClass(item.owner)}`}
+                      className={`size-1 rounded-full ${dotClass(item.owner, colors)}`}
                     />
                   ))}
                 </span>
@@ -1039,6 +1041,7 @@ function WishDetail({
   const deleteWish = useCouple((s) => s.deleteWish);
   const partnerName = useCouple((s) => s.partnerName);
   const myUserId = useCouple((s) => s.myUserId);
+  const colors = usePlayerColors();
   const [menu, setMenu] = useState(false);
   const side = viewedWishOwner(wish, myUserId);
   const when = wish.createdAt
@@ -1104,7 +1107,7 @@ function WishDetail({
 
       <div className="flex-1 overflow-y-auto px-5 pb-36">
         <p className="mt-5 flex items-center gap-2 text-[14px] text-muted">
-          <span className={`size-3 rounded-full ${side === "me" ? "bg-blue" : "bg-pink"}`} />
+          <span className={`size-3 rounded-full ${pieceBg(side === "me" ? colors.me : colors.partner)}`} />
           {side === "me" ? "Ты" : partnerName} · {when}
         </p>
         <h1 className="mt-3 text-[32px] leading-tight font-semibold">{wish.title}</h1>
@@ -1648,7 +1651,8 @@ function BirthdaySettings({ onBack }: { onBack: () => void }) {
       </button>
       <h1 className="mt-5 text-[34px] font-semibold tracking-tight">Настройки</h1>
       <AccountLogoutButton />
-      <div className="mt-6 rounded-[22px] bg-raised px-5 py-5">
+      <ColorChoice />
+      <div className="mt-4 rounded-[22px] bg-raised px-5 py-5">
         <p className="text-[13px] text-muted">Твой код</p>
         <p className="mt-3 text-[28px] font-semibold tracking-[0.18em] text-pink">{prettyCode}</p>
       </div>
@@ -1684,6 +1688,40 @@ function BirthdaySettings({ onBack }: { onBack: () => void }) {
         Выйти из пары
       </button>
     </section>
+  );
+}
+
+function ColorChoice() {
+  const myColor = useCouple((s) => s.myColor);
+  const colors = usePlayerColors();
+  const pick = (color: PieceColor) => {
+    useCouple.setState({ myColor: color });
+    void saveMyProfile({ data: { color } }).catch(() => undefined);
+  };
+  return (
+    <div className="mt-4 rounded-[22px] bg-raised px-5 py-5">
+      <p className="text-[13px] text-muted">Твой цвет</p>
+      <p className="mt-1 text-[14px] leading-5 text-[#e6e1d6]">Один и тот же на твоём телефоне и у партнёра.</p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => pick("blue")}
+          className={`min-h-11 rounded-full text-[16px] font-semibold ${myColor === "blue" ? "bg-blue text-bg" : "bg-bg"}`}
+        >
+          Синий
+        </button>
+        <button
+          type="button"
+          onClick={() => pick("pink")}
+          className={`min-h-11 rounded-full text-[16px] font-semibold ${myColor === "pink" ? "bg-pink text-bg" : "bg-bg"}`}
+        >
+          Розовый
+        </button>
+      </div>
+      {myColor && colors.me !== myColor ? (
+        <p className="mt-3 text-[13px] leading-5 text-muted">Этот цвет уже у партнёра, поэтому на доске у тебя другой.</p>
+      ) : null}
+    </div>
   );
 }
 
