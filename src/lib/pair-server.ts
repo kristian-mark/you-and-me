@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { ensureMembership, membershipOf, type ProfileRow } from "@/lib/pair-access";
 import { assertSafeId, eqFilter, removeWishPhoto, sbDelete, sbInsert, sbPatch, sbSelect } from "@/lib/supabase-app";
+import { deleteCoupleGames } from "@/lib/turn/server";
 
 export type PairProfile = {
   userId: string;
@@ -150,6 +151,7 @@ export const leavePairRemote = createServerFn({ method: "POST" })
     for (const wish of wishes) {
       if (wish.photo_path?.startsWith(`${pairId}/`)) await removeWishPhoto(wish.photo_path);
     }
+    await deleteCoupleGames(pairId);
     await sbDelete("app_pairs", eqFilter("id", pairId));
     await sbDelete("app_tasks", eqFilter("pair_id", pairId));
     await sbDelete("app_wishes", eqFilter("pair_id", pairId));

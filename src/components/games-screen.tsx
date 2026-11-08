@@ -7,8 +7,8 @@ import {
   DotsAndBoxes,
   Durak,
   Reversi,
-  TicTacToe,
 } from "@/components/games-play";
+import { TicTacToe } from "@/components/ttt-screen";
 import { useCouple } from "@/lib/couple-store";
 
 const GAMES = [
@@ -73,7 +73,7 @@ export function GamesScreen({ onBack }: { onBack: () => void }) {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[17px]">{item.title}</span>
-                <span className="block text-[13px] text-muted">Новая игра</span>
+                <span className="block text-[13px] text-muted">{item.id === "ttt" ? "По очереди, когда удобно" : "Новая игра"}</span>
               </span>
               <ChevronRight className="size-4 shrink-0 text-muted" />
             </button>

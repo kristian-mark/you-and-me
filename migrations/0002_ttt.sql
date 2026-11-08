@@ -1,3 +1,6 @@
+-- Legacy local/Neon table from an earlier preview. The couple match now lives in
+-- Supabase public.app_games. This file stays so databases that already applied it
+-- keep a stable migration history.
 create table if not exists ttt_games (
   code text primary key,
   board text not null default '---------',
