@@ -203,6 +203,8 @@ export type QuizState = {
   myDoneAt?: string;
   partnerDoneAt?: string;
   remindedAt?: string;
+  /** When the partner asked us to take the test. Not their answers. */
+  partnerRemindedAt?: string;
   consented: boolean;
 };
 

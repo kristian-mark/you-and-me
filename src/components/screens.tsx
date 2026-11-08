@@ -55,6 +55,8 @@ import { useCouple, usePlayerColors, viewedOwner, viewedWishOwner, type CheckLis
 import { pieceBg, type PieceColor } from "@/lib/pair-color";
 import { leaveSharedPair } from "@/lib/leave-pair";
 import { refreshPairTasks, refreshPairWishes } from "@/lib/pair-live";
+import { openCompatibilityQuiz } from "@/lib/quiz-live";
+import { quizNudge } from "@/lib/quiz-sync";
 import { deletePairTask } from "@/lib/pair-tasks";
 import { deletePairWish } from "@/lib/pair-wishes";
 import { LIST_POLL_MS, useScreenPoll } from "@/lib/screen-poll";
@@ -80,6 +82,12 @@ export function TasksScreen() {
   const openTask = useCouple((s) => s.openTask);
   const partnerName = useCouple((s) => s.partnerName);
   const myUserId = useCouple((s) => s.myUserId);
+  const quiz = useCouple((s) => s.quiz);
+  const nudge = quizNudge({
+    myDoneAt: quiz.myDoneAt,
+    partnerRemindedAt: quiz.partnerRemindedAt,
+    partnerName,
+  });
   const [sheet, setSheet] = useState<"new" | Task | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "mine" | "partner" | "open">("all");
@@ -120,6 +128,15 @@ export function TasksScreen() {
       ) : (
         <>
           <ScreenHeader title="Задачи" onAdd={() => setSheet("new")} />
+          {nudge ? (
+            <button
+              type="button"
+              onClick={openCompatibilityQuiz}
+              className="mx-5 mb-3 min-h-11 rounded-[22px] bg-raised px-4 py-3 text-left text-[15px] leading-5"
+            >
+              {nudge}
+            </button>
+          ) : null}
       {tasks.length === 0 ? (
         <EmptyState
           icon={
@@ -1534,6 +1551,13 @@ const MORE = [
 export function MoreScreen() {
   const setMore = useCouple((s) => s.setMore);
   const moreOpen = useCouple((s) => s.moreOpen);
+  const partnerName = useCouple((s) => s.partnerName);
+  const quiz = useCouple((s) => s.quiz);
+  const nudge = quizNudge({
+    myDoneAt: quiz.myDoneAt,
+    partnerRemindedAt: quiz.partnerRemindedAt,
+    partnerName,
+  });
 
   if (moreOpen === "notes") {
     return <NotesScreen onBack={() => setMore(null)} />;
@@ -1607,8 +1631,13 @@ export function MoreScreen() {
               }`}
             >
               <Icon className="size-5 text-muted" />
-              <span className="flex-1 text-[16px]">{item.label}</span>
-              <ChevronRight className="size-4 text-muted" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[16px]">{item.label}</span>
+                {item.id === "test" && nudge ? (
+                  <span className="mt-1 block text-[13px] leading-4 text-muted">{nudge}</span>
+                ) : null}
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-muted" />
             </button>
           );
         })}

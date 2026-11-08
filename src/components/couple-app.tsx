@@ -33,6 +33,7 @@ import {
 import { getMyPair, joinByInvite, saveMyProfile, saveTogetherSince, type PairProfile } from "@/lib/pair-server";
 import { savePairTask } from "@/lib/pair-tasks";
 import { packWish, savePairWish } from "@/lib/pair-wishes";
+import { refreshCoupleQuiz } from "@/lib/quiz-live";
 import { PAIR_POLL_MS, PAIR_WAIT_POLL_MS, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 
 export function CoupleApp() {
@@ -232,6 +233,9 @@ function AppShell() {
   const wishes = useCouple((s) => s.wishes);
   const myUserId = useCouple((s) => s.myUserId);
   const partnerUserId = useCouple((s) => s.partnerUserId);
+  useEffect(() => {
+    void refreshCoupleQuiz().catch(() => undefined);
+  }, []);
   useEffect(() => {
     let stop = false;
     const run = async () => {
