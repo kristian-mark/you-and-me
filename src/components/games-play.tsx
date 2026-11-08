@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { CircleHelp, Flag, Globe } from "lucide-react";
 import { useCouple } from "@/lib/couple-store";
-import { actTtt, type TttSeat, type TttState } from "@/lib/ttt-local";
+import { actTtt, type TttSeat, type TttState } from "@/lib/ttt-sync";
 import {
   DOTS,
   FLEET_LENGTHS,
@@ -10,7 +10,6 @@ import {
   type DCard,
   type DotsState,
   type DurakState,
-  type Mark,
   type Piece,
   type RevCell,
   type Ship,
@@ -201,8 +200,7 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain: () => void 
 
   const send = (action: "move" | "rematch" | "resign", index?: number) => {
     if (!pairCode) return;
-    const who = action === "move" && state?.local ? state.turn : seat;
-    void actTtt({ data: { code: pairCode, seat: who, action, index } }).then(accept).catch(() => undefined);
+    void actTtt({ data: { code: pairCode, seat, action, index } }).then(accept).catch(() => undefined);
   };
 
   const mine: TttSeat = seat;
@@ -210,7 +208,7 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain: () => void 
   const starter = state ? sideOf(state.starter) : "me";
   const turn = state ? sideOf(state.turn) : "me";
   const result = state?.phase === "done" ? (state.winner === "draw" ? "draw" : sideOf(state.winner)) : null;
-  const myTurn = Boolean(state && state.phase === "play" && (state.local || state.turn === mine));
+  const myTurn = Boolean(state && state.phase === "play" && state.turn === mine);
   const line = state
     ? tttLine(state.board.map((cell) => sideOf(cell)))
     : null;
@@ -345,7 +343,7 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain: () => void 
               })}
             </div>
           </div>
-          {state.local || myTurn ? (
+          {myTurn ? (
             <div className="pb-6 text-center">
               <p className="flex items-center justify-center gap-2 text-[20px] font-semibold">
                 <span className="size-3 rounded-full bg-move" />

@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { Camera, ChevronLeft, ChevronRight, Eye, Lock, Shield, Sparkles, X } from "lucide-react";
-import { useCouple, type Person } from "@/lib/couple-store";
+import { useCouple, viewedWishOwner, type Person } from "@/lib/couple-store";
+import { leaveSharedPair } from "@/lib/leave-pair";
 
 const MONTHS_SHORT = ["янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"];
 
 function dayLabel(iso: string) {
-  const [y, m, d] = iso.split("-").map(Number);
+  const [, m, d] = iso.split("-").map(Number);
   if (!m || !d) return "";
   return `${MONTHS_SHORT[m - 1]} ${d}`;
 }
@@ -148,9 +149,10 @@ function YearScreen({ year, onBack }: { year: number; onBack: () => void }) {
   const wishes = useCouple((s) => s.wishes);
   const tasks = useCouple((s) => s.tasks);
   const notes = useCouple((s) => s.notes);
+  const myUserId = useCouple((s) => s.myUserId);
   const prefix = String(year);
   const doneWishes = wishes.filter((w) => w.fulfilled && (w.fulfilledAt ?? w.createdAt).startsWith(prefix));
-  const mine = doneWishes.filter((w) => w.owner === "me").length;
+  const mine = doneWishes.filter((w) => viewedWishOwner(w, myUserId) === "me").length;
   const latest = [...doneWishes].sort((a, b) => (b.fulfilledAt ?? b.createdAt).localeCompare(a.fulfilledAt ?? a.createdAt))[0];
   const latestMonth = latest ? MONTH_FULL[Number((latest.fulfilledAt ?? latest.createdAt).slice(5, 7)) - 1] : "";
   const closed = tasks.filter((t) => t.done && (t.dueDate ?? t.createdAt).startsWith(prefix)).length;
@@ -705,7 +707,6 @@ function DatesScreen({ onBack }: { onBack: () => void }) {
 }
 
 function LeaveScreen({ onBack }: { onBack: () => void }) {
-  const leavePair = useCouple((s) => s.leavePair);
   return (
     <section className="fixed inset-0 z-[80] flex flex-col bg-bg px-5 pb-8 pt-6">
       <button type="button" onClick={onBack} className="text-left text-muted">
@@ -738,7 +739,7 @@ function LeaveScreen({ onBack }: { onBack: () => void }) {
       </p>
       <button
         type="button"
-        onClick={leavePair}
+        onClick={() => void leaveSharedPair().then(onBack).catch(() => undefined)}
         className="mt-auto w-full rounded-full bg-[#d45a1f] py-4 text-[17px] font-semibold"
       >
         Выйти из пары

@@ -42,6 +42,7 @@ export async function compressPhotoFile(file: File) {
 
 export async function compressPhotoData(dataUrl: string) {
   if (!dataUrl) return "";
+  if (/^https?:\/\//i.test(dataUrl) || dataUrl.startsWith("blob:")) return dataUrl;
   if (dataUrl.length <= MAX_CHARS && dataUrl.startsWith("data:image/jpeg")) return dataUrl;
   try {
     const img = await loadImage(dataUrl);

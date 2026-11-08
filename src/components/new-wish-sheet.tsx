@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, Search } from "lucide-react";
 import { compressPhotoFile } from "@/lib/compress-photo";
-import { useCouple, type Wish, type WishPriority } from "@/lib/couple-store";
+import { useCouple, viewedWishOwner, type Wish, type WishPriority } from "@/lib/couple-store";
 import { packWish, savePairWish } from "@/lib/pair-wishes";
 
 const POPULAR = [
@@ -68,6 +68,7 @@ export function NewWishSheet({ wish, onClose }: { wish?: Wish; onClose: () => vo
   const addWish = useCouple((s) => s.addWish);
   const updateWish = useCouple((s) => s.updateWish);
   const partnerName = useCouple((s) => s.partnerName);
+  const myUserId = useCouple((s) => s.myUserId);
   const photoRef = useRef<HTMLInputElement>(null);
   const [link, setLink] = useState(wish?.link ?? "");
   const [photo, setPhoto] = useState(wish?.photo ?? "");
@@ -76,7 +77,7 @@ export function NewWishSheet({ wish, onClose }: { wish?: Wish; onClose: () => vo
   const [currency, setCurrency] = useState(wish?.currency ?? "RUB");
   const [priority, setPriority] = useState<WishPriority>(wish?.priority ?? "want");
   const [note, setNote] = useState(wish?.note ?? "");
-  const [forMe, setForMe] = useState(wish ? wish.owner === "me" : true);
+  const [forMe, setForMe] = useState(wish ? viewedWishOwner(wish, myUserId) === "me" : true);
   const [pickCurrency, setPickCurrency] = useState(false);
   const [pickPriority, setPickPriority] = useState(false);
 
