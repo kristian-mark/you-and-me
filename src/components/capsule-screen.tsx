@@ -14,6 +14,7 @@ import {
 import { ru } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, LockKeyhole, PencilLine } from "lucide-react";
 import { useCouple, type Capsule } from "@/lib/couple-store";
+import { togetherDay } from "@/lib/pair-identity";
 
 function daysWord(n: number) {
   const mod10 = n % 10;
@@ -132,18 +133,20 @@ function CapsuleRow({
 function WriteCapsule({ onClose }: { onClose: () => void }) {
   const partnerName = useCouple((s) => s.partnerName);
   const anniversaryDate = useCouple((s) => s.anniversaryDate);
+  const pairedAt = useCouple((s) => s.pairedAt);
   const addCapsule = useCouple((s) => s.addCapsule);
   const presets = useMemo(() => {
     const today = new Date();
     const year = addYears(new Date(today.getFullYear(), today.getMonth(), today.getDate()), 1);
-    const anniversary = nextFromStamp(anniversaryDate || "2024-03-24");
+    const chosen = togetherDay(anniversaryDate, pairedAt);
+    const anniversary = chosen ? nextFromStamp(chosen) : year;
     const newYear = new Date(today.getFullYear() + 1, 0, 1);
     return {
       anniversary: toIso(anniversary),
       newyear: toIso(newYear),
       year: toIso(year),
     };
-  }, [anniversaryDate]);
+  }, [anniversaryDate, pairedAt]);
 
   const [opensAt, setOpensAt] = useState(presets.year);
   const [preset, setPreset] = useState<"anniversary" | "newyear" | "year" | "custom">("year");

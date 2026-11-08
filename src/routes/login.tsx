@@ -72,7 +72,7 @@ function Login() {
   };
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-10 pt-14">
+    <main className="app-frame safe-pad flex min-h-dvh flex-col px-5 pb-10 pt-14">
       <div className="flex items-center gap-2">
         <span className="relative h-4 w-7">
           <span className="absolute top-0 left-0 size-4 rounded-full bg-blue" />

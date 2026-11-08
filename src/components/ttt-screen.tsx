@@ -18,9 +18,9 @@ function textOf(error: unknown) {
   return "Не вышло связаться с партией";
 }
 
-function Cross() {
+function Cross({ tone }: { tone: "me" | "partner" }) {
   return (
-    <svg viewBox="0 0 48 48" className="size-11 text-mark" aria-hidden="true">
+    <svg viewBox="0 0 48 48" className={`size-[46%] ${tone === "me" ? "text-blue" : "text-pink"}`} aria-hidden="true">
       <path
         d="M14 14 L34 34 M34 14 L14 34"
         fill="none"
@@ -32,12 +32,16 @@ function Cross() {
   );
 }
 
-function Nought() {
-  return <span className="size-10 rounded-full border-[3px] border-blue" />;
+function Nought({ tone }: { tone: "me" | "partner" }) {
+  return (
+    <span
+      className={`size-[42%] rounded-full border-[3px] ${tone === "me" ? "border-blue" : "border-pink"}`}
+    />
+  );
 }
 
-function Mark({ cross }: { cross: boolean }) {
-  return cross ? <Cross /> : <Nought />;
+function Mark({ cross, tone }: { cross: boolean; tone: "me" | "partner" }) {
+  return cross ? <Cross tone={tone} /> : <Nought tone={tone} />;
 }
 
 export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void }) {
@@ -53,7 +57,11 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
   const busy = useRef(false);
 
   const take = (next: TttMatchView) => {
-    setView((prev) => (!prev || next.version >= prev.version ? next : prev));
+    setView((prev) => {
+      if (!prev) return next;
+      if (next.version !== prev.version) return next.version > prev.version ? next : prev;
+      return (next.updatedAt ?? "") >= (prev.updatedAt ?? "") ? next : prev;
+    });
   };
 
   useEffect(() => {
@@ -68,16 +76,18 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
         });
     };
     pull();
-    const onFocus = () => {
+    const timer = window.setInterval(pull, 4000);
+    const onVisible = () => {
       if (document.visibilityState === "visible") pull();
     };
-    document.addEventListener("visibilitychange", onFocus);
-    window.addEventListener("focus", onFocus);
-    const timer = window.setInterval(onFocus, 5000);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    window.addEventListener("pageshow", onVisible);
     return () => {
       stop = true;
-      document.removeEventListener("visibilitychange", onFocus);
-      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+      window.removeEventListener("pageshow", onVisible);
       window.clearInterval(timer);
     };
   }, [tick]);
@@ -143,167 +153,113 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
   };
 
   return (
-    <section
-      className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pt-5 pb-8"
-      data-status={view?.status ?? "loading"}
-    >
-      <header className="grid grid-cols-[1fr_auto_1fr] items-center">
-        <button type="button" onClick={onBack} className="w-fit text-[17px] text-muted">
-          ‹ Игры
-        </button>
-        <h1 className="text-[17px] font-semibold">Крестики-нолики</h1>
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => setHelp(true)}
-            className="grid size-10 place-items-center text-muted"
-            aria-label="Правила"
-          >
+    <section className="fixed inset-0 z-30 flex flex-col overflow-hidden bg-bg" data-status={view?.status ?? "loading"}>
+      <div className="app-frame flex min-h-0 w-full flex-1 flex-col">
+        <header className="grid shrink-0 grid-cols-[auto_1fr_auto] items-center gap-2">
+          <button type="button" onClick={onBack} className="inline-flex min-h-11 items-center pr-2 text-[17px] text-[#e6e1d6]">
+            ‹ Игры
+          </button>
+          <h1 className="truncate text-center text-[17px] font-semibold">Крестики-нолики</h1>
+          <button type="button" onClick={() => setHelp(true)} className="grid size-11 place-items-center text-[#e6e1d6]" aria-label="Правила">
             <CircleHelp className="size-5" />
           </button>
-        </div>
-      </header>
+        </header>
 
-      {!view || !banner ? (
-        <div className="grid flex-1 place-items-center px-4 text-center">
-          <div>
-            <p className="text-[17px] text-muted">{notice || "Открываем партию…"}</p>
-            {notice ? (
-              <button
-                type="button"
-                onClick={() => setTick((value) => value + 1)}
-                className="mt-4 text-[16px] text-cream"
-              >
-                Ещё раз
-              </button>
-            ) : null}
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-1 flex-col">
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <PlayerCard
-              name={myName}
-              mark={markLabel(true)}
-              active={view.myTurn && view.status !== "finished"}
-              tone="blue"
-            />
-            <PlayerCard
-              name={partnerName}
-              mark={markLabel(false)}
-              active={!view.myTurn && view.status === "active"}
-              tone="pink"
-            />
-          </div>
-
-          <div className="mt-5 text-center" aria-live="polite">
-            <p className="flex items-center justify-center gap-2 text-[22px] font-semibold">
-              <span
-                className={`size-3 rounded-full ${view.myTurn && view.status !== "finished" ? "bg-move" : "border border-dashed border-move"}`}
-              />
-              {banner.title}
-            </p>
-            <p className="mt-1 text-[15px] text-muted">{banner.hint}</p>
-          </div>
-
-          <div className={`mt-4 flex flex-1 items-center ${pending ? "opacity-70" : ""}`}>
-            <div className="mx-auto grid w-full max-w-[320px] grid-cols-3 gap-3">
-              {view.board.map((cell, index) => {
-                const win = view.winningLine?.includes(index);
-                const cross =
-                  cell === null || view.youAreCrosses === null
-                    ? false
-                    : cell === "me"
-                      ? view.youAreCrosses
-                      : !view.youAreCrosses;
-                const label =
-                  cell === null
-                    ? `Клетка ${index + 1}, пусто`
-                    : cell === "me"
-                      ? `Клетка ${index + 1}, твоя`
-                      : `Клетка ${index + 1}, партнёра`;
-                return (
-                  <button
-                    key={index}
-                    type="button"
-                    aria-label={label}
-                    disabled={
-                      pending || view.status === "finished" || !view.myTurn || cell !== null
-                    }
-                    onClick={() => onCell(index)}
-                    className={`grid aspect-square place-items-center rounded-[22px] bg-raised disabled:opacity-100 ${
-                      win ? "border border-cream" : "border border-transparent"
-                    }`}
-                  >
-                    {cell ? <Mark cross={cross} /> : null}
-                  </button>
-                );
-              })}
+        {!view || !banner ? (
+          <div className="grid flex-1 place-items-center px-4 text-center">
+            <div>
+              <p className="text-[17px] text-[#e6e1d6]">{notice || "Открываем партию…"}</p>
+              {notice ? (
+                <button type="button" onClick={() => setTick((value) => value + 1)} className="mt-4 inline-flex min-h-11 items-center text-[16px] text-cream">
+                  Ещё раз
+                </button>
+              ) : null}
             </div>
           </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="mt-2 grid shrink-0 grid-cols-2 gap-2">
+              <PlayerCard name={myName} mark={markLabel(true)} active={view.myTurn && view.status !== "finished"} tone="blue" />
+              <PlayerCard name={partnerName} mark={markLabel(false)} active={!view.myTurn && view.status === "active"} tone="pink" />
+            </div>
 
-          <div className="mt-4 flex items-center gap-3 rounded-[22px] bg-raised px-4 py-3">
-            <span className="size-3 shrink-0 rounded-full bg-blue" />
-            <span className="min-w-0 flex-1 truncate text-[15px]">{myName}</span>
-            <span className="text-[22px] font-semibold tracking-wide">
-              {view.wins.me}
-              <span className="px-2 text-muted">:</span>
-              {view.wins.partner}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-right text-[15px]">{partnerName}</span>
-            <span className="size-3 shrink-0 rounded-full bg-pink" />
+            <div className="mt-2 shrink-0 text-center" aria-live="polite">
+              <p className="flex items-center justify-center gap-2 text-[20px] font-semibold sm:text-[22px]">
+                <span className={`size-3 rounded-full ${view.myTurn && view.status !== "finished" ? "bg-move" : "border border-dashed border-move"}`} />
+                {banner.title}
+              </p>
+              <p className="mt-0.5 text-[15px] text-[#e6e1d6]">{banner.hint}</p>
+            </div>
+
+            <div className={`mt-2 flex min-h-0 flex-1 items-center justify-center [container-type:size] ${pending ? "opacity-70" : ""}`}>
+              <div className="grid aspect-square grid-cols-3 gap-2 sm:gap-3" style={{ width: "min(100cqw, 100cqh, 34rem)" }}>
+                {view.board.map((cell, index) => {
+                  const win = view.winningLine?.includes(index);
+                  const tone: "me" | "partner" = cell === "partner" ? "partner" : "me";
+                  const cross =
+                    cell === null || view.youAreCrosses === null ? false : cell === "me" ? view.youAreCrosses : !view.youAreCrosses;
+                  const label =
+                    cell === null ? `Клетка ${index + 1}, пусто` : cell === "me" ? `Клетка ${index + 1}, твоя` : `Клетка ${index + 1}, партнёра`;
+                  return (
+                    <button
+                      key={index}
+                      type="button"
+                      aria-label={label}
+                      disabled={pending || view.status === "finished" || !view.myTurn || cell !== null}
+                      onClick={() => onCell(index)}
+                      className={`grid aspect-square place-items-center rounded-[18px] bg-raised disabled:opacity-100 sm:rounded-[22px] ${win ? "border border-cream" : "border border-transparent"}`}
+                    >
+                      {cell ? <Mark cross={cross} tone={tone} /> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-2 flex shrink-0 items-center gap-3 rounded-[22px] bg-raised px-4 py-2.5">
+              <span className="size-3 shrink-0 rounded-full bg-blue" />
+              <span className="min-w-0 flex-1 truncate text-[15px]">{myName}</span>
+              <span className="text-[20px] font-semibold tracking-wide">
+                {view.wins.me}
+                <span className="px-2 text-[#e6e1d6]">:</span>
+                {view.wins.partner}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-right text-[15px]">{partnerName}</span>
+              <span className="size-3 shrink-0 rounded-full bg-pink" />
+            </div>
+            {view.draws > 0 ? <p className="mt-1 shrink-0 text-center text-[13px] text-[#e6e1d6]">Ничьих: {view.draws}</p> : null}
+            {notice ? <p className="mt-1 shrink-0 text-center text-[14px] text-pink">{notice}</p> : null}
+
+            {view.status === "finished" ? (
+              <div className="mt-2 grid shrink-0 grid-cols-2 gap-2">
+                <button type="button" onClick={onBack} className="min-h-11 rounded-full border border-line text-[16px] font-semibold">
+                  К играм
+                </button>
+                <button type="button" onClick={onNew} disabled={pending} className="min-h-11 rounded-full bg-cream text-[16px] font-semibold text-cream-fg disabled:opacity-60">
+                  Новая игра
+                </button>
+              </div>
+            ) : null}
           </div>
-          {view.draws > 0 ? (
-            <p className="mt-2 text-center text-[13px] text-muted">Ничьих: {view.draws}</p>
-          ) : null}
-          {notice ? <p className="mt-3 text-center text-[14px] text-pink">{notice}</p> : null}
-
-          {view.status === "finished" ? (
-            <button
-              type="button"
-              onClick={onNew}
-              disabled={pending}
-              className="mt-4 w-full rounded-full bg-cream py-4 text-[17px] font-semibold text-cream-fg disabled:opacity-60"
-            >
-              Новая игра
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={onBack}
-            className="mt-3 w-full rounded-full border border-line py-4 text-[17px] font-semibold"
-          >
-            К играм
-          </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {help ? (
-        <div
-          className="fixed inset-0 z-40 flex items-end bg-black/60"
-          onClick={() => setHelp(false)}
-        >
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60" onClick={() => setHelp(false)}>
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="ttt-help-title"
-            className="w-full rounded-t-[28px] bg-raised px-5 pt-5 pb-8"
+            className="app-frame w-full rounded-t-[28px] bg-raised px-5 pt-5"
             onClick={(event) => event.stopPropagation()}
           >
-            <p id="ttt-help-title" className="text-[20px] font-semibold">
-              Как играть
+            <p id="ttt-help-title" className="text-[20px] font-semibold">Как играть</p>
+            <p className="mt-3 text-[16px] leading-6 text-[#e6e1d6]">
+              Если партии нет, любой из вас нажимает клетку и ходит первым — крестиками. Дальше только по очереди: свой ход
+              нельзя повторить, пока не сходит партнёр. Быть онлайн одновременно не нужно — партия хранится у вас двоих.
+              После победы, поражения или ничьей нажмите «Новая игра»: снова кто первый нажмёт клетку, тот и начинает.
             </p>
-            <p className="mt-3 text-[16px] leading-6 text-muted">
-              Если партии нет, любой из вас нажимает клетку и ходит первым — крестиками. Дальше
-              только по очереди: свой ход нельзя повторить, пока не сходит партнёр. Быть онлайн
-              одновременно не нужно — партия хранится у вас двоих. После победы, поражения или
-              ничьей нажмите «Новая игра»: снова кто первый нажмёт клетку, тот и начинает.
-            </p>
-            <button
-              type="button"
-              onClick={() => setHelp(false)}
-              className="mt-5 w-full rounded-full bg-cream py-3.5 font-semibold text-cream-fg"
-            >
+            <button type="button" onClick={() => setHelp(false)} className="mt-5 min-h-11 w-full rounded-full bg-cream font-semibold text-cream-fg">
               Понятно
             </button>
           </div>
@@ -325,16 +281,12 @@ function PlayerCard({
   tone: "blue" | "pink";
 }) {
   return (
-    <div
-      className={`min-w-0 rounded-[22px] border-2 bg-raised px-3 py-3 ${active ? (tone === "blue" ? "border-blue" : "border-pink") : "border-transparent"}`}
-    >
+    <div className={`min-w-0 rounded-[18px] border-2 bg-raised px-3 py-2 ${active ? (tone === "blue" ? "border-blue" : "border-pink") : "border-transparent"}`}>
       <div className="flex items-center gap-2">
-        <span
-          className={`size-8 shrink-0 rounded-full ${tone === "blue" ? "bg-blue" : "bg-pink"}`}
-        />
+        <span className={`size-8 shrink-0 rounded-full ${tone === "blue" ? "bg-blue" : "bg-pink"}`} />
         <div className="min-w-0">
           <p className="truncate text-[16px] font-semibold">{name}</p>
-          <p className="text-[13px] text-muted">{mark}</p>
+          <p className="text-[13px] text-[#e6e1d6]">{mark}</p>
         </div>
       </div>
     </div>

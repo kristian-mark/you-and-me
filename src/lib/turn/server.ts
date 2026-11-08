@@ -225,7 +225,7 @@ function parseVersion(value: unknown) {
   return value;
 }
 
-export const loadTttMatch = createServerFn({ method: "GET" })
+export const loadTttMatch = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .handler(async ({ context }): Promise<TttMatchView> => {
     try {

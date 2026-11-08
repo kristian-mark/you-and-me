@@ -1,6 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { pickQuestion, questionById } from "@/lib/daily-questions";
+import {
+  DEMO_ANNIVERSARY,
+  FALLBACK_MY_NAME,
+  FALLBACK_PARTNER_NAME,
+  scrubStoredCouple,
+} from "@/lib/pair-identity";
 
 export type TabId = "tasks" | "calendar" | "wishes" | "lists" | "more";
 export type WishOwner = "me" | "partner" | "all";
@@ -249,6 +255,7 @@ type CoupleState = {
   votes: VotePoll[];
   capsules: Capsule[];
   anniversaryDate: string;
+  pairedAt: string | null;
   gettingMarried: boolean;
   weddingDate: string;
   people: Person[];
@@ -276,6 +283,12 @@ type CoupleState = {
     inviteCode: string;
     myBirthday: string | null;
     partnerBirthday: string | null;
+  }) => void;
+  applyCoupleIdentity: (input: {
+    myName: string;
+    partnerName: string;
+    pairedAt: string | null;
+    togetherSince: string | null;
   }) => void;
   replaceTasks: (tasks: Task[]) => void;
   replaceWishes: (wishes: Wish[]) => void;
@@ -427,15 +440,15 @@ export const useCouple = create<CoupleState>()(
       seat: "a",
       waiting: false,
       joined: false,
-      myName: "Кристианс",
-      partnerName: "Алиночка",
+      myName: FALLBACK_MY_NAME,
+      partnerName: FALLBACK_PARTNER_NAME,
       myUserId: null,
       partnerUserId: null,
       inviteCode: null,
       deletedTaskIds: [],
       deletedWishIds: [],
       myBirthday: "",
-      partnerBirthday: "2000-03-29",
+      partnerBirthday: "",
       myBirthdayEdits: 0,
       partnerBirthdayEdits: 0,
       tab: "tasks",
@@ -449,7 +462,8 @@ export const useCouple = create<CoupleState>()(
       noteFolders: [],
       votes: [],
       capsules: [],
-      anniversaryDate: "2021-03-24",
+      anniversaryDate: "",
+      pairedAt: null,
       gettingMarried: false,
       weddingDate: "",
       people: [],
@@ -514,6 +528,16 @@ export const useCouple = create<CoupleState>()(
         }
         if (input.myBirthday && !get().myBirthday) patch.myBirthday = input.myBirthday;
         if (input.partnerBirthday && get().partnerBirthdayEdits === 0) patch.partnerBirthday = input.partnerBirthday;
+        set(patch);
+      },
+      applyCoupleIdentity: (input) => {
+        const patch: Partial<CoupleState> = {
+          myName: input.myName,
+          partnerName: input.partnerName,
+          pairedAt: input.pairedAt,
+        };
+        if (input.togetherSince) patch.anniversaryDate = input.togetherSince;
+        else if (get().anniversaryDate === DEMO_ANNIVERSARY) patch.anniversaryDate = "";
         set(patch);
       },
       replaceTasks: (tasks) => set({ tasks }),
@@ -1052,6 +1076,7 @@ export const useCouple = create<CoupleState>()(
       merge: (persisted, current) => {
         const raw = (persisted ?? {}) as Partial<CoupleState> & { notes?: unknown };
         const notes = Array.isArray(raw.notes) && typeof raw.notes[0] === "string" ? [] : (raw.notes as CoupleState["notes"]) ?? [];
+        const names = scrubStoredCouple(raw);
         return {
           ...current,
           ...raw,
@@ -1066,6 +1091,11 @@ export const useCouple = create<CoupleState>()(
           inviteCode: raw.inviteCode ?? null,
           deletedTaskIds: raw.deletedTaskIds ?? [],
           deletedWishIds: raw.deletedWishIds ?? [],
+          myName: names.myName,
+          partnerName: names.partnerName,
+          anniversaryDate: names.anniversaryDate,
+          pairedAt: raw.pairedAt ?? null,
+          partnerBirthday: names.partnerBirthday,
           gameWins: raw.gameWins ?? { me: 0, partner: 0 },
           tttRecord: raw.tttRecord ?? { me: 0, partner: 0, games: 0 },
           tttNoted: raw.tttNoted ?? "",
