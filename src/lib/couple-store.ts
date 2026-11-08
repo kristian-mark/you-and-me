@@ -283,8 +283,11 @@ type CoupleState = {
   setMyName: (name: string) => void;
   setPartnerName: (name: string) => void;
   setPairUsers: (mine: string | null, partner: string | null) => void;
-  /** Keep local data when it already belongs to this user. Otherwise drop it. */
-  claimAccount: (userId: string) => "keep" | "drop";
+  /**
+   * Same owner: keep. No owner yet: adopt and un-finish a local quiz.
+   * A different owner: drop personal data before any upload.
+   */
+  claimAccount: (userId: string) => "keep" | "adopt" | "drop";
   /** Drop personal data on sign-out so the next account cannot upload it. */
   forgetAccount: () => void;
   setSeat: (seat: "a" | "b") => void;
@@ -593,7 +596,22 @@ export const useCouple = create<CoupleState>()(
       },
       setPairUsers: (mine, partner) => set({ myUserId: mine, partnerUserId: partner }),
       claimAccount: (userId) => {
-        if (get().localOwnerId === userId) return "keep";
+        const owner = get().localOwnerId;
+        if (owner === userId) return "keep";
+        if (!owner) {
+          const quiz = get().quiz;
+          set({
+            localOwnerId: userId,
+            myUserId: userId,
+            quiz: {
+              ...quiz,
+              myDoneAt: undefined,
+              partnerDoneAt: undefined,
+              partnerAnswers: [],
+            },
+          });
+          return "adopt";
+        }
         set(blankPersonal(userId));
         return "drop";
       },

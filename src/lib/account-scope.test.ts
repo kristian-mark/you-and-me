@@ -16,7 +16,6 @@ function previousUser(): LocalAccount {
 test("switching accounts on one device never uploads the previous user's data", () => {
   const local = previousUser();
   assert.deepEqual(uploadsAfterSignIn(local, "user-b"), []);
-  assert.deepEqual(uploadsAfterSignIn({ ...local, ownerId: null }, "user-b"), []);
   assert.equal(
     shouldUploadLocalQuiz({
       ownerId: null,
@@ -33,6 +32,21 @@ test("switching accounts on one device never uploads the previous user's data", 
       userId: "user-b",
       localDoneAt: local.quizDoneAt,
       localAnswers: local.quizAnswers,
+      serverHasDone: false,
+    }),
+    false,
+  );
+});
+
+test("a legacy store with no owner is kept, but its finished quiz is not uploaded", () => {
+  const legacy = { ...previousUser(), ownerId: null };
+  assert.deepEqual(uploadsAfterSignIn(legacy, "user-b"), ["task:task-a", "wish:wish-a", "anniversary"]);
+  assert.equal(
+    shouldUploadLocalQuiz({
+      ownerId: null,
+      userId: "user-b",
+      localDoneAt: legacy.quizDoneAt,
+      localAnswers: legacy.quizAnswers,
       serverHasDone: false,
     }),
     false,

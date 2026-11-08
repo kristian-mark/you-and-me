@@ -9,9 +9,13 @@ export type LocalAccount = {
   anniversaryDate: string;
 };
 
-/** Keep local data only when it is already stamped with this signed-in user. */
-export function claimDecision(ownerId: string | null | undefined, userId: string): "keep" | "drop" {
-  if (ownerId && ownerId === userId) return "keep";
+/**
+ * Missing owner is a legacy phone: adopt it for whoever is signed in.
+ * A different owner is someone else's data and must be dropped.
+ */
+export function claimDecision(ownerId: string | null | undefined, userId: string): "keep" | "adopt" | "drop" {
+  if (!ownerId) return "adopt";
+  if (ownerId === userId) return "keep";
   return "drop";
 }
 
@@ -22,14 +26,14 @@ export function shouldUploadLocalQuiz(input: {
   localAnswers: number[];
   serverHasDone: boolean;
 }) {
-  if (claimDecision(input.ownerId, input.userId ?? "") === "drop") return false;
-  if (!input.userId || input.serverHasDone || !input.localDoneAt) return false;
+  if (!input.ownerId || !input.userId || input.ownerId !== input.userId) return false;
+  if (input.serverHasDone || !input.localDoneAt) return false;
   return parseQuizAnswers(input.localAnswers) !== null;
 }
 
 /**
  * What a sign-in would send to the server from this browser.
- * A different account, or an old unscoped store, sends nothing.
+ * Another account sends nothing. A legacy store keeps its rows, but not a finished quiz.
  */
 export function uploadsAfterSignIn(local: LocalAccount, userId: string): string[] {
   if (claimDecision(local.ownerId, userId) === "drop") return [];
