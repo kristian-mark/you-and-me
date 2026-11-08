@@ -130,9 +130,15 @@
   }
 }
 
-.app-frame {
+.app-sheet {
   width: min(100%, 28rem);
   margin-inline: auto;
+}
+
+@media (min-width: 768px) {
+  .app-sheet {
+    width: min(100%, 44rem);
+  }
 }
 
 @media (min-width: 768px) {

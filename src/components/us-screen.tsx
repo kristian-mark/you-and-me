@@ -2,8 +2,9 @@ import { useMemo, useState } from "react";
 import { Camera, ChevronLeft, ChevronRight, Eye, Lock, Shield, Sparkles, X } from "lucide-react";
 import { useCouple, viewedWishOwner, type Person } from "@/lib/couple-store";
 import { leaveSharedPair } from "@/lib/leave-pair";
-import { togetherDay } from "@/lib/pair-identity";
+import { togetherDay, anniversaryCountdown } from "@/lib/pair-identity";
 import { saveMyProfile, saveTogetherSince } from "@/lib/pair-server";
+import { AccountLogoutButton } from "@/components/account-logout";
 
 const MONTHS_SHORT = ["янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"];
 
@@ -33,19 +34,7 @@ export function UsScreen({ onClose }: { onClose: () => void }) {
   const [page, setPage] = useState<"hub" | "settings" | "year">("hub");
   const year = new Date().getFullYear();
 
-  const stats = useMemo(() => {
-    if (!together) return null;
-    const start = new Date(`${together}T12:00:00`);
-    start.setHours(0, 0, 0, 0);
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const days = Math.max(0, Math.round((now.getTime() - start.getTime()) / 86400000));
-    let next = new Date(now.getFullYear(), start.getMonth(), start.getDate());
-    if (next < now) next = new Date(now.getFullYear() + 1, start.getMonth(), start.getDate());
-    const until = Math.round((next.getTime() - now.getTime()) / 86400000);
-    const n = now.getFullYear() - start.getFullYear() + (next.getFullYear() > now.getFullYear() ? 0 : 1);
-    return { days, until, ordinal: n <= 0 ? 1 : n };
-  }, [together]);
+  const stats = useMemo(() => (together ? anniversaryCountdown(together) : null), [together]);
 
   const fulfilled = wishes.filter((w) => w.fulfilled && (w.fulfilledAt ?? "").startsWith(String(year))).length;
   const closed = tasks.filter((t) => t.done && (t.dueDate ?? t.createdAt).startsWith(String(year))).length;
@@ -58,7 +47,9 @@ export function UsScreen({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <section className="fixed inset-0 z-[80] overflow-y-auto bg-bg px-5 pb-16 pt-6">
+    <section className="fixed inset-0 z-[80] overflow-y-auto bg-bg">
+      <div className="app-sheet px-5 pb-8">
+      <div className="sticky top-0 z-10 -mx-5 bg-bg px-5 pt-6 pb-3">
       <p className="text-[11px] tracking-[0.16em] text-muted uppercase">
         {myName} и {partnerName}
       </p>
@@ -74,8 +65,10 @@ export function UsScreen({ onClose }: { onClose: () => void }) {
           </button>
         </div>
       </div>
+      </div>
 
-      <button type="button" className="mt-6 w-full rounded-[24px] bg-raised px-4 py-4 text-left">
+      <div className="md:grid md:grid-cols-2 md:items-start md:gap-3">
+      <button type="button" className="mt-3 w-full rounded-[24px] bg-raised px-4 py-4 text-left md:mt-0">
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2">
             <Camera className="size-5" />
@@ -92,14 +85,25 @@ export function UsScreen({ onClose }: { onClose: () => void }) {
         </p>
       </button>
 
-      <div className="mt-3 grid grid-cols-2 rounded-[24px] bg-raised px-4 py-5">
+      <div className="mt-3 grid grid-cols-2 rounded-[24px] bg-raised px-4 py-5 md:col-span-2">
         <div>
-          <p className="text-[40px] font-semibold leading-none">{stats ? stats.days : "—"}</p>
+          <p className="text-[40px] font-semibold leading-none">{stats ? stats.daysTogether : "—"}</p>
           <p className="mt-2 text-[13px] text-[#e6e1d6]">{stats ? "дней вместе" : "дата не указана"}</p>
         </div>
         <div className="border-l border-line pl-4">
-          <p className="text-[40px] font-semibold leading-none text-[#f07167]">{stats ? stats.until : "—"}</p>
-          <p className="mt-2 text-[13px] text-[#e6e1d6]">{stats ? `до ${stats.ordinal}-й годовщины` : "укажите в настройках"}</p>
+          {stats?.celebrating ? (
+            <>
+              <p className="text-[28px] font-semibold leading-none text-cream">Сегодня</p>
+              <p className="mt-2 text-[13px] text-[#e6e1d6]">{stats.ordinal}-я годовщина</p>
+            </>
+          ) : (
+            <>
+              <p className="text-[40px] font-semibold leading-none text-[#f07167]">{stats?.daysUntil ?? "—"}</p>
+              <p className="mt-2 text-[13px] text-[#e6e1d6]">
+                {stats ? `до ${stats.ordinal}-й годовщины` : "укажите в настройках"}
+              </p>
+            </>
+          )}
         </div>
       </div>
 
@@ -130,10 +134,12 @@ export function UsScreen({ onClose }: { onClose: () => void }) {
         <span className="text-muted">›</span>
       </button>
 
-      <button type="button" onClick={() => setPage("settings")} className="mt-3 flex w-full items-center justify-between rounded-[24px] bg-raised px-4 py-4">
+      <button type="button" onClick={() => setPage("settings")} className="mt-3 flex w-full items-center justify-between rounded-[24px] bg-raised px-4 py-4 md:col-span-2">
         <span>Настройки пары</span>
         <span className="text-muted">›</span>
       </button>
+      </div>
+      </div>
     </section>
   );
 }
@@ -279,11 +285,13 @@ function CoupleSettings({ onBack }: { onBack: () => void }) {
   const joined = togetherDay(null, pairedAt);
   const joinedLabel = joined ? `в приложении с ${joined.slice(8, 10)}.${joined.slice(5, 7)}.${joined.slice(0, 4)}` : "в паре";
   return (
-    <section className="fixed inset-0 z-[80] overflow-y-auto bg-bg px-5 pb-16 pt-6">
-      <button type="button" onClick={onBack} className="text-muted">
+    <section className="fixed inset-0 z-[80] overflow-y-auto bg-bg">
+      <div className="app-sheet px-5 pb-4">
+      <button type="button" onClick={onBack} className="inline-flex min-h-11 items-center text-muted">
         ‹ Мы
       </button>
       <h1 className="mt-4 text-[34px] font-semibold tracking-tight">Настройки пары</h1>
+      <AccountLogoutButton />
 
       <div className="mt-5 overflow-hidden rounded-[24px] bg-raised px-4">
         <div className="flex items-center gap-3 py-4">
@@ -338,11 +346,12 @@ function CoupleSettings({ onBack }: { onBack: () => void }) {
       <button
         type="button"
         onClick={() => setPage("leave")}
-        className="mt-3 flex w-full items-center justify-between rounded-[22px] bg-raised px-4 py-4"
+        className="mt-3 flex min-h-11 w-full items-center justify-between rounded-[22px] bg-raised px-4 py-4"
       >
         <span>Выйти из пары</span>
         <span className="text-muted">›</span>
       </button>
+      </div>
     </section>
   );
 }

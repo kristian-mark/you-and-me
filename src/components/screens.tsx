@@ -55,6 +55,7 @@ import { useCouple, viewedOwner, viewedWishOwner, type CheckList, type Task, typ
 import { leaveSharedPair } from "@/lib/leave-pair";
 import { deletePairTask } from "@/lib/pair-tasks";
 import { deletePairWish } from "@/lib/pair-wishes";
+import { AccountLogoutButton } from "@/components/account-logout";
 import { saveMyProfile } from "@/lib/pair-server";
 
 function promptTitle(label: string) {
@@ -1641,6 +1642,7 @@ function BirthdaySettings({ onBack }: { onBack: () => void }) {
         ‹ Ещё
       </button>
       <h1 className="mt-5 text-[34px] font-semibold tracking-tight">Настройки</h1>
+      <AccountLogoutButton />
       <div className="mt-6 rounded-[22px] bg-raised px-5 py-5">
         <p className="text-[13px] text-muted">Твой код</p>
         <p className="mt-3 text-[28px] font-semibold tracking-[0.18em] text-pink">{prettyCode}</p>
@@ -1672,7 +1674,7 @@ function BirthdaySettings({ onBack }: { onBack: () => void }) {
       <button
         type="button"
         onClick={() => void leaveSharedPair().catch(() => undefined)}
-        className="mt-4 w-full rounded-[22px] bg-raised py-4 text-[16px] text-muted"
+        className="mt-4 min-h-11 w-full rounded-[22px] bg-raised py-4 text-[16px] text-muted"
       >
         Выйти из пары
       </button>
