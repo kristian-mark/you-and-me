@@ -15,7 +15,14 @@ import { authEnabled } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { useCouple } from "@/lib/couple-store";
 import { compressPhotoData } from "@/lib/compress-photo";
-import { getMyPair, joinByInvite, saveMyProfile, type PairProfile } from "@/lib/pair-server";
+import {
+  DEMO_ANNIVERSARY,
+  FALLBACK_MY_NAME,
+  FALLBACK_PARTNER_NAME,
+  profileName,
+  togetherDay,
+} from "@/lib/pair-identity";
+import { getMyPair, joinByInvite, saveMyProfile, saveTogetherSince, type PairProfile } from "@/lib/pair-server";
 import { mergeSynced } from "@/lib/pair-sync";
 import { deletePairTask, listPairTasks, savePairTask } from "@/lib/pair-tasks";
 import { deletePairWish, listPairWishes, packWish, savePairWish } from "@/lib/pair-wishes";
@@ -26,8 +33,7 @@ export function CoupleApp() {
 
 function PairGate() {
   const { user, isPending } = useCurrentUserState();
-  const setMyName = useCouple((s) => s.setMyName);
-  const setPartnerName = useCouple((s) => s.setPartnerName);
+  const applyCoupleIdentity = useCouple((s) => s.applyCoupleIdentity);
   const setPairUsers = useCouple((s) => s.setPairUsers);
   const applyPairSession = useCouple((s) => s.applyPairSession);
   const partnerArrived = useCouple((s) => s.partnerArrived);
@@ -37,6 +43,7 @@ function PairGate() {
   const [needsLogin, setNeedsLogin] = useState(false);
   const [tick, setTick] = useState(0);
   const hadPair = useRef(false);
+  const pushedAnniversary = useRef("");
 
   useEffect(() => {
     let stop = false;
@@ -47,9 +54,32 @@ function PairGate() {
           setProfile(next);
           setNeedsLogin(false);
           setError("");
-          const mine = next.displayName;
-          if (mine) setMyName(mine);
-          if (next.partner?.displayName) setPartnerName(next.partner.displayName);
+          const mine = profileName(
+            next.displayName,
+            next.email ?? user?.primaryEmail ?? null,
+            FALLBACK_MY_NAME,
+          );
+          const partner = profileName(next.partner?.displayName, null, FALLBACK_PARTNER_NAME);
+          const localAnniversary = useCouple.getState().anniversaryDate;
+          applyCoupleIdentity({
+            myName: mine,
+            partnerName: partner,
+            pairedAt: next.pairedAt,
+            togetherSince: next.togetherSince,
+          });
+          if (
+            !next.togetherSince &&
+            localAnniversary &&
+            localAnniversary !== DEMO_ANNIVERSARY &&
+            togetherDay(localAnniversary, null) &&
+            pushedAnniversary.current !== localAnniversary
+          ) {
+            pushedAnniversary.current = localAnniversary;
+            void saveTogetherSince({ data: localAnniversary }).catch(() => undefined);
+          }
+          if (!next.email && user?.primaryEmail) {
+            void saveMyProfile({ data: { email: user.primaryEmail } }).catch(() => undefined);
+          }
           setPairUsers(next.userId, next.partner?.userId ?? null);
           applyPairSession({
             pairId: next.pairId,
@@ -84,7 +114,7 @@ function PairGate() {
       stop = true;
       window.clearInterval(timer);
     };
-  }, [applyPairSession, leavePair, partnerArrived, setMyName, setPartnerName, setPairUsers, tick]);
+  }, [applyCoupleIdentity, applyPairSession, leavePair, partnerArrived, setPairUsers, tick, user?.primaryEmail]);
 
   useEffect(() => {
     if (!profile?.partner) return;
@@ -208,7 +238,7 @@ function InviteScreen({
     : "Выбрать дату";
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col px-5 pt-12 pb-10">
+    <main className="app-frame safe-pad flex min-h-dvh flex-col px-5 pt-12 pb-10">
       <div>
         <h1 className="text-[34px] font-semibold tracking-tight">Мы</h1>
       </div>
@@ -315,7 +345,7 @@ function AppShell() {
   }, [wishes, myUserId, partnerUserId]);
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col bg-bg">
+    <main className="app-frame safe-pad flex min-h-dvh flex-col bg-bg">
       {tab === "tasks" ? <TasksScreen /> : null}
       {tab === "calendar" ? <CalendarScreen /> : null}
       {tab === "wishes" ? <WishesScreen /> : null}

@@ -26,7 +26,7 @@ export function UsBadge() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-full bg-raised px-3 py-[9px]"
+        className="flex min-h-11 items-center gap-2 rounded-full bg-raised px-3"
       >
         <span className="text-sm text-fg">Мы</span>
         <span className="relative h-5 w-8">
@@ -106,7 +106,7 @@ export function TabBar() {
   if (moreOpen || openTaskId) return null;
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-      <div className="mx-auto grid max-w-md grid-cols-5 px-2 pt-2 pb-3">
+      <div className="app-frame grid grid-cols-5 px-2 pt-1 pb-1">
         {TABS.map((t) => {
           const Icon = t.icon;
           const active = tab === t.id;
@@ -115,7 +115,7 @@ export function TabBar() {
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className={`flex flex-col items-center gap-1 text-[11px] ${active ? "text-fg" : "text-muted"}`}
+              className={`flex min-h-11 flex-col items-center justify-center gap-0.5 text-[11px] ${active ? "text-fg" : "text-muted"}`}
             >
               <Icon className="size-5" strokeWidth={active ? 2.2 : 1.7} />
               {t.label}

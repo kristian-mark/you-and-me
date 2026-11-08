@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { Camera, ChevronLeft, ChevronRight, Eye, Lock, Shield, Sparkles, X } from "lucide-react";
 import { useCouple, viewedWishOwner, type Person } from "@/lib/couple-store";
 import { leaveSharedPair } from "@/lib/leave-pair";
+import { togetherDay } from "@/lib/pair-identity";
+import { saveMyProfile, saveTogetherSince } from "@/lib/pair-server";
 
 const MONTHS_SHORT = ["янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"];
 
@@ -21,7 +23,9 @@ function personDay(iso: string, noYear?: boolean) {
 export function UsScreen({ onClose }: { onClose: () => void }) {
   const myName = useCouple((s) => s.myName);
   const partnerName = useCouple((s) => s.partnerName);
-  const anniversary = useCouple((s) => s.anniversaryDate || "2021-03-24");
+  const anniversary = useCouple((s) => s.anniversaryDate);
+  const pairedAt = useCouple((s) => s.pairedAt);
+  const together = togetherDay(anniversary, pairedAt);
   const wishes = useCouple((s) => s.wishes);
   const cards = useCouple((s) => s.cards);
   const tasks = useCouple((s) => s.tasks);
@@ -30,7 +34,8 @@ export function UsScreen({ onClose }: { onClose: () => void }) {
   const year = new Date().getFullYear();
 
   const stats = useMemo(() => {
-    const start = new Date(anniversary);
+    if (!together) return null;
+    const start = new Date(`${together}T12:00:00`);
     start.setHours(0, 0, 0, 0);
     const now = new Date();
     now.setHours(0, 0, 0, 0);
@@ -40,7 +45,7 @@ export function UsScreen({ onClose }: { onClose: () => void }) {
     const until = Math.round((next.getTime() - now.getTime()) / 86400000);
     const n = now.getFullYear() - start.getFullYear() + (next.getFullYear() > now.getFullYear() ? 0 : 1);
     return { days, until, ordinal: n <= 0 ? 1 : n };
-  }, [anniversary]);
+  }, [together]);
 
   const fulfilled = wishes.filter((w) => w.fulfilled && (w.fulfilledAt ?? "").startsWith(String(year))).length;
   const closed = tasks.filter((t) => t.done && (t.dueDate ?? t.createdAt).startsWith(String(year))).length;
@@ -64,7 +69,7 @@ export function UsScreen({ onClose }: { onClose: () => void }) {
             <span className="absolute left-0 top-0.5 size-4 rounded-full bg-blue" />
             <span className="absolute right-0 top-0.5 size-4 rounded-full bg-pink" />
           </span>
-          <button type="button" onClick={onClose} className="grid size-10 place-items-center rounded-full bg-raised" aria-label="Закрыть">
+          <button type="button" onClick={onClose} className="grid size-11 place-items-center rounded-full bg-raised" aria-label="Закрыть">
             <X className="size-5" />
           </button>
         </div>
@@ -89,12 +94,12 @@ export function UsScreen({ onClose }: { onClose: () => void }) {
 
       <div className="mt-3 grid grid-cols-2 rounded-[24px] bg-raised px-4 py-5">
         <div>
-          <p className="text-[40px] font-semibold leading-none">{stats.days}</p>
-          <p className="mt-2 text-[13px] text-muted">дней вместе</p>
+          <p className="text-[40px] font-semibold leading-none">{stats ? stats.days : "—"}</p>
+          <p className="mt-2 text-[13px] text-[#e6e1d6]">{stats ? "дней вместе" : "дата не указана"}</p>
         </div>
         <div className="border-l border-line pl-4">
-          <p className="text-[40px] font-semibold leading-none text-[#f07167]">{stats.until}</p>
-          <p className="mt-2 text-[13px] text-muted">до {stats.ordinal}-й годовщины</p>
+          <p className="text-[40px] font-semibold leading-none text-[#f07167]">{stats ? stats.until : "—"}</p>
+          <p className="mt-2 text-[13px] text-[#e6e1d6]">{stats ? `до ${stats.ordinal}-й годовщины` : "укажите в настройках"}</p>
         </div>
       </div>
 
@@ -145,7 +150,9 @@ function Stat({ n, label }: { n: number; label: string }) {
 const MONTH_FULL = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
 
 function YearScreen({ year, onBack }: { year: number; onBack: () => void }) {
-  const anniversary = useCouple((s) => s.anniversaryDate || "2021-03-24");
+  const anniversary = useCouple((s) => s.anniversaryDate);
+  const pairedAt = useCouple((s) => s.pairedAt);
+  const together = togetherDay(anniversary, pairedAt) ?? `${year}-01-01`;
   const wishes = useCouple((s) => s.wishes);
   const tasks = useCouple((s) => s.tasks);
   const notes = useCouple((s) => s.notes);
@@ -157,7 +164,7 @@ function YearScreen({ year, onBack }: { year: number; onBack: () => void }) {
   const latestMonth = latest ? MONTH_FULL[Number((latest.fulfilledAt ?? latest.createdAt).slice(5, 7)) - 1] : "";
   const closed = tasks.filter((t) => t.done && (t.dueDate ?? t.createdAt).startsWith(prefix)).length;
   const files = notes.filter((n) => n.createdAt.startsWith(prefix)).length;
-  const start = new Date(anniversary);
+  const start = new Date(`${together}T12:00:00`);
   const end = new Date(year, 11, 31);
   const daysEnd = Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000));
   const counts = Array.from({ length: 12 }, (_, i) => {
@@ -255,8 +262,10 @@ function CoupleSettings({ onBack }: { onBack: () => void }) {
   const pairCode = useCouple((s) => s.pairCode);
   const myName = useCouple((s) => s.myName);
   const partnerName = useCouple((s) => s.partnerName);
+  const pairedAt = useCouple((s) => s.pairedAt);
   const people = useCouple((s) => s.people);
-  const anniversary = useCouple((s) => s.anniversaryDate || "2021-03-24");
+  const anniversary = useCouple((s) => s.anniversaryDate);
+  const together = togetherDay(anniversary, pairedAt);
   const [page, setPage] = useState<"hub" | "people" | "dates" | "leave" | "name">("hub");
   if (page === "people") return <PeopleScreen onBack={() => setPage("hub")} />;
   if (page === "dates") return <DatesScreen onBack={() => setPage("hub")} />;
@@ -265,8 +274,10 @@ function CoupleSettings({ onBack }: { onBack: () => void }) {
   const bits = myName.trim().split(/\s+/);
   const first = bits[0] ?? myName;
   const rest = bits.slice(1).join(" ");
-  const since = anniversary;
-  const pretty = `${since.slice(5, 7)}/${since.slice(8, 10)}/${since.slice(0, 4)}`;
+  const since = together;
+  const pretty = since ? `${since.slice(5, 7)}/${since.slice(8, 10)}/${since.slice(0, 4)}` : "не указана";
+  const joined = togetherDay(null, pairedAt);
+  const joinedLabel = joined ? `в приложении с ${joined.slice(8, 10)}.${joined.slice(5, 7)}.${joined.slice(0, 4)}` : "в паре";
   return (
     <section className="fixed inset-0 z-[80] overflow-y-auto bg-bg px-5 pb-16 pt-6">
       <button type="button" onClick={onBack} className="text-muted">
@@ -290,7 +301,7 @@ function CoupleSettings({ onBack }: { onBack: () => void }) {
           <span className="size-14 shrink-0 rounded-full bg-pink" />
           <div>
             <p className="text-[17px]">{partnerName}</p>
-            <p className="mt-1 text-[13px] text-muted">в приложении с 05/11/2026</p>
+            <p className="mt-1 text-[13px] text-[#e6e1d6]">{joinedLabel}</p>
           </div>
         </div>
       </div>
@@ -349,10 +360,13 @@ function NameScreen({ onBack }: { onBack: () => void }) {
         <button
           type="button"
           onClick={() => {
-            useCouple.getState().setMyName(value);
+            const next = value.trim();
+            if (!next) return;
+            useCouple.getState().setMyName(next);
+            void saveMyProfile({ data: { displayName: next } }).catch(() => undefined);
             onBack();
           }}
-          className="text-blue"
+          className="inline-flex min-h-11 items-center text-blue"
         >
           Готово
         </button>
@@ -368,7 +382,9 @@ function NameScreen({ onBack }: { onBack: () => void }) {
 
 function PeopleScreen({ onBack }: { onBack: () => void }) {
   const people = useCouple((s) => s.people);
-  const anniversary = useCouple((s) => s.anniversaryDate || "2021-03-24");
+  const anniversaryDate = useCouple((s) => s.anniversaryDate);
+  const pairedAt = useCouple((s) => s.pairedAt);
+  const anniversary = togetherDay(anniversaryDate, pairedAt);
   const [edit, setEdit] = useState<(typeof people)[number] | "new" | null>(null);
   return (
     <section className="fixed inset-0 z-[80] flex flex-col bg-bg px-5 pb-10 pt-4">
@@ -415,7 +431,7 @@ function PeopleScreen({ onBack }: { onBack: () => void }) {
           <span className="text-[15px] text-[#f07167]">♥</span>
           Годовщина пары
         </span>
-        <span className="text-[15px] text-muted">{dayLabel(anniversary)}</span>
+        <span className="text-[15px] text-muted">{anniversary ? dayLabel(anniversary) : "не указана"}</span>
       </div>
 
       {edit ? (
@@ -634,6 +650,7 @@ function DarkCal({
 
 function DatesScreen({ onBack }: { onBack: () => void }) {
   const anniversary = useCouple((s) => s.anniversaryDate);
+  const pairedAt = useCouple((s) => s.pairedAt);
   const gettingMarried = useCouple((s) => s.gettingMarried);
   const partnerName = useCouple((s) => s.partnerName);
   const [date, setDate] = useState(anniversary);
@@ -654,6 +671,7 @@ function DatesScreen({ onBack }: { onBack: () => void }) {
           onClick={() => {
             useCouple.getState().setAnniversaryDate(date);
             useCouple.getState().setGettingMarried(marry);
+            void saveTogetherSince({ data: date || null }).catch(() => undefined);
             onBack();
           }}
           className="text-blue"
@@ -694,7 +712,7 @@ function DatesScreen({ onBack }: { onBack: () => void }) {
       </p>
       {cal ? (
         <DarkCal
-          value={date || "2021-03-24"}
+          value={date || togetherDay(null, pairedAt) || new Date().toISOString().slice(0, 10)}
           onPick={(day) => {
             setDate(day);
             setCal(false);

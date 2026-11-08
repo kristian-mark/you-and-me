@@ -12,6 +12,8 @@ export type PairProfile = {
   birthday: string | null;
   pairId: string | null;
   seat: "a" | "b" | null;
+  togetherSince: string | null;
+  pairedAt: string | null;
   partner: {
     userId: string;
     displayName: string | null;
@@ -21,8 +23,16 @@ export type PairProfile = {
 };
 
 function labelOf(row: ProfileRow) {
-  if (row.display_name && row.display_name !== row.email?.split("@")[0]) return row.display_name;
-  return row.display_name || row.email?.split("@")[0] || null;
+  const name = row.display_name?.trim();
+  if (name) return name;
+  const local = row.email?.split("@")[0]?.trim();
+  return local || null;
+}
+
+function dayOf(value: string | null | undefined) {
+  if (!value) return null;
+  const day = value.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
 }
 
 async function profileView(userId: string): Promise<PairProfile> {
@@ -45,11 +55,13 @@ async function profileView(userId: string): Promise<PairProfile> {
   return {
     userId: me.profile.user_id,
     email: me.profile.email,
-    displayName: me.profile.display_name,
+    displayName: labelOf(me.profile),
     inviteCode: me.profile.invite_code,
     birthday: me.profile.birthday,
     pairId: me.pairId,
     seat: partner ? me.seat : null,
+    togetherSince: dayOf(me.pair?.together_since),
+    pairedAt: me.pair?.created_at ?? null,
     partner,
   };
 }
@@ -70,6 +82,26 @@ export const saveMyProfile = createServerFn({ method: "POST" })
     if (Object.keys(patch).length) {
       await sbPatch("app_profiles", eqFilter("user_id", context.userId), patch);
     }
+    return profileView(context.userId);
+  });
+
+export const saveTogetherSince = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: unknown) => {
+    if (input === null || input === "") return null;
+    if (typeof input !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(input)) throw new Error("Некорректная дата");
+    if (Number.isNaN(Date.parse(`${input}T12:00:00Z`))) throw new Error("Некорректная дата");
+    return input;
+  })
+  .handler(async ({ context, data }): Promise<PairProfile> => {
+    const me = await membershipOf(context.userId);
+    if (!me?.pairId) throw new Error("Сначала соединитесь парой");
+    const patched = await sbPatch(
+      "app_pairs",
+      eqFilter("id", assertSafeId(me.pairId)),
+      { together_since: data },
+    );
+    if (!patched.length) throw new Error("Дату пары не удалось сохранить");
     return profileView(context.userId);
   });
 

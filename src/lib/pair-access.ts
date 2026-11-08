@@ -13,6 +13,8 @@ export type PairRow = {
   id: string;
   a_user_id: string;
   b_user_id: string | null;
+  created_at?: string;
+  together_since?: string | null;
 };
 
 export type Membership = {

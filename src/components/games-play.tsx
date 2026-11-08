@@ -64,8 +64,8 @@ function Shell({
   children: ReactNode;
 }) {
   return (
-    <section className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pt-6 pb-10">
-      <button type="button" onClick={onBack} className="w-fit text-[17px] text-muted">
+    <section className="mx-auto flex min-h-dvh w-full flex-col px-5 pt-6 pb-10 app-frame">
+      <button type="button" onClick={onBack} className="inline-flex min-h-11 items-center text-[17px] text-[#e6e1d6]">
         ‹ Игры
       </button>
       <h1 className="mt-3 text-[32px] font-semibold tracking-tight">{title}</h1>

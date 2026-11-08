@@ -42,7 +42,7 @@ export function GamesScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <section className="px-5 pt-6 pb-10">
-      <button type="button" onClick={onBack} className="text-[17px] text-muted">
+      <button type="button" onClick={onBack} className="inline-flex min-h-11 items-center text-[17px] text-[#e6e1d6]">
         ‹ Ещё
       </button>
       <h1 className="mt-4 text-[40px] font-semibold tracking-tight">Игры</h1>
