@@ -46,6 +46,7 @@ import {
   PREVIEW_CLIENT_ID,
   PREVIEW_CLIENT_SECRET,
 } from "./preview";
+import { vercelPreviewAuth } from "./vercel-preview-origins";
 
 // Kick (and share) PGLite bootstrap as soon as the auth server module loads.
 void ensureDbReady();
@@ -103,26 +104,44 @@ const LOCAL_DEV_ORIGINS: string[] = [
   "http://127.0.0.1:8080",
   "http://[::1]:8080",
 ];
-const baseURL = explicitBaseURL ?? {
-  // Include loopback hosts so dynamic baseURL resolves for local email/password
-  // (not only the preview wildcard).
-  allowedHosts: [...previewAllowedHosts, "localhost", "127.0.0.1", "[::1]"],
-  // `auto` → trust both http:// and https:// expansions of allowedHosts
-  // (preview is https; local dev is http).
-  protocol: "auto" as const,
-  fallback: "http://localhost:8080",
-};
+// Vercel preview builds all share BETTER_AUTH_URL=production, so the browser
+// Origin (this deployment) is rejected. Trust that deployment's own hosts
+// from the system env — not every *.vercel.app. Production leaves this empty.
+const vercelPreview = vercelPreviewAuth({
+  VERCEL_ENV: env("VERCEL_ENV"),
+  VERCEL_URL: env("VERCEL_URL"),
+  VERCEL_BRANCH_URL: env("VERCEL_BRANCH_URL"),
+  VERCEL_PROJECT_PRODUCTION_URL: env("VERCEL_PROJECT_PRODUCTION_URL"),
+  BETTER_AUTH_URL: explicitBaseURL,
+});
+if (env("VERCEL_ENV")?.toLowerCase() === "preview" && !vercelPreview.baseURL) {
+  console.warn(
+    "[auth] VERCEL_ENV=preview but VERCEL_URL / VERCEL_BRANCH_URL / VERCEL_PROJECT_PRODUCTION_URL are missing. Enable Automatically expose System Environment Variables, or preview sign-up stays Invalid origin.",
+  );
+}
+
+const baseURL = vercelPreview.baseURL ??
+  explicitBaseURL ?? {
+    // Include loopback hosts so dynamic baseURL resolves for local email/password
+    // (not only the preview wildcard).
+    allowedHosts: [...previewAllowedHosts, "localhost", "127.0.0.1", "[::1]"],
+    // `auto` → trust both http:// and https:// expansions of allowedHosts
+    // (preview is https; local dev is http).
+    protocol: "auto" as const,
+    fallback: "http://localhost:8080",
+  };
 
 // Origins Better Auth accepts on credentialed POSTs (sign-up/sign-in, etc.).
 // Missing entries here surface as FORBIDDEN "Invalid origin".
 const trustedOrigins: string[] = explicitBaseURL
-  ? [explicitBaseURL, ...LOCAL_DEV_ORIGINS]
+  ? [explicitBaseURL, ...LOCAL_DEV_ORIGINS, ...vercelPreview.trustedOrigins]
   : [
       // Host wildcards (matched against Origin's host)
       ...previewAllowedHosts,
       // Full-origin wildcards (matched against Origin)
       ...previewAllowedHosts.flatMap((host) => [`https://${host}`, `http://${host}`]),
       ...LOCAL_DEV_ORIGINS,
+      ...vercelPreview.trustedOrigins,
     ];
 
 const databaseUrl = env("DATABASE_URL");
