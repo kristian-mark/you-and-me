@@ -1,12 +1,25 @@
-const URL = "https://vydpgldekbudzlmystvm.supabase.co";
-const KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5ZHBnbGRla2J1ZHpsbXlzdHZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM4OTA5MjAsImV4cCI6MjEwOTQ2NjkyMH0.J3y8L5rUWApol0ZLKd_j7CrYmtw8Z7guJOokk3EKr0w";
+import { env } from "@/lib/env.server";
 
-const headers = {
-  apikey: KEY,
-  Authorization: `Bearer ${KEY}`,
-  "Content-Type": "application/json",
-};
+function serverConfig() {
+  if (typeof window !== "undefined") {
+    throw new Error("Supabase is server-only");
+  }
+  const url = env("SUPABASE_URL")?.replace(/\/$/, "");
+  const key = env("SUPABASE_SECRET_KEY");
+  if (!url || !key) {
+    throw new Error("SUPABASE_URL and SUPABASE_SECRET_KEY must be set on the server");
+  }
+  return { url, key };
+}
+
+function headers() {
+  const { key } = serverConfig();
+  return {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    "Content-Type": "application/json",
+  };
+}
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,80}$/;
 
@@ -25,15 +38,17 @@ async function fail(res: Response): Promise<never> {
 }
 
 export async function sbSelect<T>(table: string, query: string): Promise<T[]> {
-  const res = await fetch(`${URL}/rest/v1/${table}?${query}`, { headers });
+  const { url } = serverConfig();
+  const res = await fetch(`${url}/rest/v1/${table}?${query}`, { headers: headers() });
   if (!res.ok) return fail(res);
   return (await res.json()) as T[];
 }
 
 export async function sbInsert<T extends Record<string, unknown>>(table: string, row: T): Promise<T> {
-  const res = await fetch(`${URL}/rest/v1/${table}`, {
+  const { url } = serverConfig();
+  const res = await fetch(`${url}/rest/v1/${table}`, {
     method: "POST",
-    headers: { ...headers, Prefer: "return=representation" },
+    headers: { ...headers(), Prefer: "return=representation" },
     body: JSON.stringify(row),
   });
   if (res.status === 409) {
@@ -51,9 +66,10 @@ export async function sbPatch<T = Record<string, unknown>>(
   query: string,
   row: Record<string, unknown>,
 ): Promise<T[]> {
-  const res = await fetch(`${URL}/rest/v1/${table}?${query}`, {
+  const { url } = serverConfig();
+  const res = await fetch(`${url}/rest/v1/${table}?${query}`, {
     method: "PATCH",
-    headers: { ...headers, Prefer: "return=representation" },
+    headers: { ...headers(), Prefer: "return=representation" },
     body: JSON.stringify(row),
   });
   if (!res.ok) return fail(res);
@@ -63,7 +79,8 @@ export async function sbPatch<T = Record<string, unknown>>(
 }
 
 export async function sbDelete(table: string, query: string) {
-  const res = await fetch(`${URL}/rest/v1/${table}?${query}`, { method: "DELETE", headers });
+  const { url } = serverConfig();
+  const res = await fetch(`${url}/rest/v1/${table}?${query}`, { method: "DELETE", headers: headers() });
   if (!res.ok) return fail(res);
 }
 
@@ -86,11 +103,12 @@ export async function uploadWishPhoto(path: string, dataUrl: string) {
   if (path.includes("..") || path.startsWith("/")) return null;
   const bytes = Buffer.from(match[2], "base64");
   if (bytes.length > 1_500_000) return null;
-  const res = await fetch(`${URL}/storage/v1/object/wishes/${path}`, {
+  const { url, key } = serverConfig();
+  const res = await fetch(`${url}/storage/v1/object/wishes/${path}`, {
     method: "POST",
     headers: {
-      apikey: KEY,
-      Authorization: `Bearer ${KEY}`,
+      apikey: key,
+      Authorization: `Bearer ${key}`,
       "Content-Type": match[1] || "image/jpeg",
       "x-upsert": "true",
     },
@@ -102,8 +120,9 @@ export async function uploadWishPhoto(path: string, dataUrl: string) {
 
 export async function downloadWishPhoto(path: string) {
   if (!path || path.includes("..") || path.startsWith("/")) return null;
-  const res = await fetch(`${URL}/storage/v1/object/wishes/${path}`, {
-    headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
+  const { url, key } = serverConfig();
+  const res = await fetch(`${url}/storage/v1/object/wishes/${path}`, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
   });
   if (!res.ok) return null;
   const bytes = Buffer.from(await res.arrayBuffer());
@@ -114,8 +133,9 @@ export async function downloadWishPhoto(path: string) {
 
 export async function removeWishPhoto(path: string) {
   if (!path || path.includes("..") || path.startsWith("/")) return;
-  await fetch(`${URL}/storage/v1/object/wishes/${path}`, {
+  const { url, key } = serverConfig();
+  await fetch(`${url}/storage/v1/object/wishes/${path}`, {
     method: "DELETE",
-    headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
   });
 }
