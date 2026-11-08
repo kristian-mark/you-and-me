@@ -1,6 +1,7 @@
+import { shouldUploadLocalQuiz } from "@/lib/account-scope";
 import { useCouple } from "@/lib/couple-store";
 import { loadCoupleQuiz, submitCoupleQuiz } from "@/lib/quiz-server";
-import { parseQuizAnswers, type QuizSnapshot } from "@/lib/quiz-sync";
+import { type QuizSnapshot } from "@/lib/quiz-sync";
 
 export function applyQuizSnapshot(view: QuizSnapshot) {
   const local = useCouple.getState().quiz;
@@ -18,10 +19,18 @@ export function applyQuizSnapshot(view: QuizSnapshot) {
 /** Load the shared quiz. A finished local copy is uploaded once if the server has none. */
 export async function refreshCoupleQuiz() {
   const view = await loadCoupleQuiz();
-  const local = useCouple.getState().quiz;
-  const localDone = parseQuizAnswers(local.myAnswers);
-  if (!view.myDoneAt && local.myDoneAt && localDone) {
-    const saved = await submitCoupleQuiz({ data: localDone });
+  const state = useCouple.getState();
+  const local = state.quiz;
+  if (
+    shouldUploadLocalQuiz({
+      ownerId: state.localOwnerId,
+      userId: state.myUserId,
+      localDoneAt: local.myDoneAt,
+      localAnswers: local.myAnswers,
+      serverHasDone: Boolean(view.myDoneAt),
+    })
+  ) {
+    const saved = await submitCoupleQuiz({ data: local.myAnswers });
     applyQuizSnapshot(saved);
     return saved;
   }

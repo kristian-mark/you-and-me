@@ -31,6 +31,11 @@ export function markWishSynced(id: string, key: string) {
   wishSeen.set(id, key);
 }
 
+export function resetSyncMarks() {
+  taskSeen.clear();
+  wishSeen.clear();
+}
+
 function signature(rows: SyncRow[]) {
   return rows
     .map((row) => `${row.id}\0${row.updatedAt ?? ""}`)
@@ -41,7 +46,7 @@ function signature(rows: SyncRow[]) {
 export async function refreshPairTasks() {
   const rows = await listPairTasks();
   const state = useCouple.getState();
-  if (!state.joined) return;
+  if (!state.joined || !state.myUserId || state.localOwnerId !== state.myUserId) return;
   const plan = planRemoteSync(
     state.tasks.filter((task) => !task.deleted),
     rows,
@@ -55,7 +60,7 @@ export async function refreshPairTasks() {
 export async function refreshPairWishes() {
   const rows = await listPairWishes();
   const state = useCouple.getState();
-  if (!state.joined) return;
+  if (!state.joined || !state.myUserId || state.localOwnerId !== state.myUserId) return;
   const plan = planRemoteSync(
     state.wishes.filter((wish) => !wish.deleted),
     rows,

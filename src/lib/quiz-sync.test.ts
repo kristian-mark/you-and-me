@@ -58,12 +58,32 @@ test("a reminder is at most once a day and only nudges someone who has not finis
   assert.equal(remindAllowed("2026-11-07T12:00:00.000Z", at), true);
   assert.equal(parseQuizAnswers(answers(2))?.length, 32);
   assert.equal(parseQuizAnswers(answers(2).slice(0, 31)), null);
+  const now = Date.parse("2026-11-08T12:00:00.000Z");
   assert.equal(
-    quizNudge({ myDoneAt: null, partnerRemindedAt: "2026-11-08T00:00:00.000Z", partnerName: "Алина" }),
+    quizNudge({
+      myDoneAt: null,
+      partnerRemindedAt: "2026-11-08T00:00:00.000Z",
+      partnerName: "Алина",
+      now,
+    }),
     "Алина ждёт тебя в тесте на совместимость",
   );
   assert.equal(
-    quizNudge({ myDoneAt: "2026-11-08T00:00:00.000Z", partnerRemindedAt: "2026-11-08T00:00:00.000Z", partnerName: "Алина" }),
+    quizNudge({
+      myDoneAt: "2026-11-08T00:00:00.000Z",
+      partnerRemindedAt: "2026-11-08T00:00:00.000Z",
+      partnerName: "Алина",
+      now,
+    }),
+    null,
+  );
+  assert.equal(
+    quizNudge({
+      myDoneAt: null,
+      partnerRemindedAt: "2026-10-01T00:00:00.000Z",
+      partnerName: "Алина",
+      now,
+    }),
     null,
   );
 });
