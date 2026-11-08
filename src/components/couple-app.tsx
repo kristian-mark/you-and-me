@@ -22,10 +22,18 @@ import {
   profileName,
   togetherDay,
 } from "@/lib/pair-identity";
+import {
+  markTaskSynced,
+  markWishSynced,
+  taskNeedsUpload,
+  taskSyncKey,
+  wishNeedsUpload,
+  wishSyncKey,
+} from "@/lib/pair-live";
 import { getMyPair, joinByInvite, saveMyProfile, saveTogetherSince, type PairProfile } from "@/lib/pair-server";
-import { mergeSynced } from "@/lib/pair-sync";
-import { deletePairTask, listPairTasks, savePairTask } from "@/lib/pair-tasks";
-import { deletePairWish, listPairWishes, packWish, savePairWish } from "@/lib/pair-wishes";
+import { savePairTask } from "@/lib/pair-tasks";
+import { packWish, savePairWish } from "@/lib/pair-wishes";
+import { PAIR_POLL_MS, PAIR_WAIT_POLL_MS, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 
 export function CoupleApp() {
   return <PairGate />;
@@ -41,138 +49,74 @@ function PairGate() {
   const [profile, setProfile] = useState<PairProfile | null>(null);
   const [error, setError] = useState("");
   const [needsLogin, setNeedsLogin] = useState(false);
-  const [tick, setTick] = useState(0);
   const hadPair = useRef(false);
   const pushedAnniversary = useRef("");
+  const pushedEmail = useRef("");
 
-  useEffect(() => {
-    let stop = false;
-    const pull = () => {
-      void getMyPair()
-        .then((next) => {
-          if (stop) return;
-          setProfile(next);
-          setNeedsLogin(false);
-          setError("");
-          const mine = profileName(
-            next.displayName,
-            next.email ?? user?.primaryEmail ?? null,
-            FALLBACK_MY_NAME,
-          );
-          const partner = profileName(next.partner?.displayName, null, FALLBACK_PARTNER_NAME);
-          const localAnniversary = useCouple.getState().anniversaryDate;
-          applyCoupleIdentity({
-            myName: mine,
-            partnerName: partner,
-            pairedAt: next.pairedAt,
-            togetherSince: next.togetherSince,
-          });
-          if (
-            !next.togetherSince &&
-            localAnniversary &&
-            localAnniversary !== DEMO_ANNIVERSARY &&
-            togetherDay(localAnniversary, null) &&
-            pushedAnniversary.current !== localAnniversary
-          ) {
-            pushedAnniversary.current = localAnniversary;
-            void saveTogetherSince({ data: localAnniversary }).catch(() => undefined);
-          }
-          if (!next.email && user?.primaryEmail) {
-            void saveMyProfile({ data: { email: user.primaryEmail } }).catch(() => undefined);
-          }
-          setPairUsers(next.userId, next.partner?.userId ?? null);
-          applyPairSession({
-            pairId: next.pairId,
-            seat: next.seat,
-            inviteCode: next.inviteCode,
-            myBirthday: next.birthday,
-            partnerBirthday: next.partner?.birthday ?? null,
-          });
-          const storedPair = useCouple.getState().pairCode ?? "";
-          const storedServerPair = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storedPair);
-          if (next.partner) {
-            hadPair.current = true;
-            partnerArrived();
-          } else if (hadPair.current || storedServerPair) {
-            hadPair.current = false;
-            leavePair();
-          }
-        })
-        .catch((err) => {
-          if (stop) return;
-          const raw = err instanceof Error ? err.message : "Облако не ответило";
-          if (/unauthor/i.test(raw)) {
-            setNeedsLogin(true);
-            return;
-          }
-          setError(raw);
-        });
-    };
-    pull();
-    const timer = window.setInterval(pull, 4000);
-    return () => {
-      stop = true;
-      window.clearInterval(timer);
-    };
-  }, [applyCoupleIdentity, applyPairSession, leavePair, partnerArrived, setPairUsers, tick, user?.primaryEmail]);
+  // Names, birthdays, email, together_since, and who is in the pair can change.
+  // Piece colors are fixed in the UI (you blue, partner pink) and are not stored.
+  // A paired tab checks on open and every 4 hours. The invite screen stays fast.
+  const waitingForPartner = Boolean(profile && !profile.partner);
+  const canPollProfile = !needsLogin && !(authEnabled && isPending);
 
-  useEffect(() => {
-    if (!profile?.partner) return;
-    let stop = false;
-    const pull = async () => {
-      try {
-        const rows = await listPairTasks();
-        if (stop || !useCouple.getState().joined) return;
-        const state = useCouple.getState();
-        const merged = mergeSynced(
-          state.tasks.filter((task) => !task.deleted),
-          rows,
-          state.deletedTaskIds,
-        );
-        useCouple.getState().rememberDeletes(merged.forget, []);
-        useCouple.getState().replaceTasks(merged.next.filter((task) => !task.deleted));
-        for (const id of merged.retryDelete) void deletePairTask({ data: id }).catch(() => undefined);
-        for (const task of merged.upload) void savePairTask({ data: task }).catch(() => undefined);
-      } catch {
-        /* keep local */
+  useScreenPoll("pair", canPollProfile, waitingForPartner ? PAIR_WAIT_POLL_MS : PAIR_POLL_MS, async () => {
+    try {
+      const next = await getMyPair();
+      setProfile(next);
+      setNeedsLogin(false);
+      setError("");
+      const mine = profileName(next.displayName, next.email ?? user?.primaryEmail ?? null, FALLBACK_MY_NAME);
+      const partner = profileName(next.partner?.displayName, null, FALLBACK_PARTNER_NAME);
+      const localAnniversary = useCouple.getState().anniversaryDate;
+      applyCoupleIdentity({
+        myName: mine,
+        partnerName: partner,
+        pairedAt: next.pairedAt,
+        togetherSince: next.togetherSince,
+      });
+      if (
+        next.pairId &&
+        !next.togetherSince &&
+        localAnniversary &&
+        localAnniversary !== DEMO_ANNIVERSARY &&
+        togetherDay(localAnniversary, null) &&
+        pushedAnniversary.current !== localAnniversary
+      ) {
+        pushedAnniversary.current = localAnniversary;
+        void saveTogetherSince({ data: localAnniversary }).catch(() => undefined);
       }
-    };
-    void pull();
-    const timer = window.setInterval(() => void pull(), 2500);
-    return () => {
-      stop = true;
-      window.clearInterval(timer);
-    };
-  }, [profile?.partner, profile?.pairId]);
-
-  useEffect(() => {
-    if (!profile?.partner) return;
-    let stop = false;
-    const pull = async () => {
-      try {
-        const rows = await listPairWishes();
-        if (stop || !useCouple.getState().joined) return;
-        const state = useCouple.getState();
-        const merged = mergeSynced(
-          state.wishes.filter((wish) => !wish.deleted),
-          rows,
-          state.deletedWishIds,
-        );
-        useCouple.getState().rememberDeletes([], merged.forget);
-        useCouple.getState().replaceWishes(merged.next.filter((wish) => !wish.deleted));
-        for (const id of merged.retryDelete) void deletePairWish({ data: id }).catch(() => undefined);
-        for (const wish of merged.upload) void savePairWish({ data: packWish(wish) }).catch(() => undefined);
-      } catch {
-        /* keep local */
+      const email = user?.primaryEmail;
+      if (!next.email && email && pushedEmail.current !== email) {
+        pushedEmail.current = email;
+        void saveMyProfile({ data: { email } }).catch(() => undefined);
       }
-    };
-    void pull();
-    const timer = window.setInterval(() => void pull(), 2500);
-    return () => {
-      stop = true;
-      window.clearInterval(timer);
-    };
-  }, [profile?.partner, profile?.pairId]);
+      setPairUsers(next.userId, next.partner?.userId ?? null);
+      applyPairSession({
+        pairId: next.pairId,
+        seat: next.seat,
+        inviteCode: next.inviteCode,
+        myBirthday: next.birthday,
+        partnerBirthday: next.partner?.birthday ?? null,
+      });
+      const storedPair = useCouple.getState().pairCode ?? "";
+      const storedServerPair = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storedPair);
+      if (next.partner) {
+        hadPair.current = true;
+        partnerArrived();
+      } else if (hadPair.current || storedServerPair) {
+        hadPair.current = false;
+        leavePair();
+      }
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : "Облако не ответило";
+      if (/unauthor/i.test(raw)) {
+        setNeedsLogin(true);
+        return;
+      }
+      setError(raw);
+      throw err;
+    }
+  });
 
   if (authEnabled && isPending) {
     return (
@@ -189,7 +133,7 @@ function PairGate() {
         <div>
           <p>{error || "Собираем профиль…"}</p>
           {error ? (
-            <button type="button" className="mt-4 text-cream" onClick={() => setTick((n) => n + 1)}>
+            <button type="button" className="mt-4 text-cream" onClick={() => void refreshScreen("pair")}>
               Ещё раз
             </button>
           ) : null}
@@ -285,8 +229,6 @@ function AppShell() {
   const wishes = useCouple((s) => s.wishes);
   const myUserId = useCouple((s) => s.myUserId);
   const partnerUserId = useCouple((s) => s.partnerUserId);
-  const seen = useRef(new Map<string, string>());
-
   useEffect(() => {
     let stop = false;
     const run = async () => {
@@ -297,12 +239,12 @@ function AppShell() {
             task.ownerUserId ??
             (task.owner === "both" ? "both" : task.owner === "me" ? myUserId : task.owner === "partner" ? partnerUserId : null),
         };
-        const key = withOwner.updatedAt ?? "";
-        if (seen.current.get(`t:${task.id}`) === key) continue;
-        seen.current.set(`t:${task.id}`, key);
+        const key = taskSyncKey(withOwner);
+        if (!taskNeedsUpload(task.id, key)) continue;
+        markTaskSynced(task.id, key);
         const saved = await savePairTask({ data: withOwner }).catch(() => null);
         if (stop || !saved?.updatedAt || saved.updatedAt === key) continue;
-        seen.current.set(`t:${task.id}`, saved.updatedAt);
+        markTaskSynced(task.id, saved.updatedAt);
         useCouple.getState().replaceTaskMeta(task.id, { updatedAt: saved.updatedAt });
       }
     };
@@ -323,14 +265,14 @@ function AppShell() {
         };
         const photo = withOwner.photo.startsWith("data:") ? await compressPhotoData(withOwner.photo) : withOwner.photo;
         const packed = packWish({ ...withOwner, photo });
-        const key = `${packed.updatedAt ?? ""}|${packed.photoPath ?? ""}|${packed.photo.startsWith("data:") ? "data" : packed.photo}`;
-        if (seen.current.get(`w:${wish.id}`) === key) continue;
-        seen.current.set(`w:${wish.id}`, key);
+        const key = wishSyncKey(packed);
+        if (!wishNeedsUpload(wish.id, key)) continue;
+        markWishSynced(wish.id, key);
         const saved = await savePairWish({ data: packed }).catch(() => null);
         if (stop || !saved) continue;
-        const savedKey = `${saved.updatedAt ?? ""}|${saved.photoPath ?? ""}|${saved.photo.startsWith("data:") ? "data" : saved.photo}`;
+        const savedKey = wishSyncKey(saved);
         if (savedKey === key) continue;
-        seen.current.set(`w:${wish.id}`, savedKey);
+        markWishSynced(wish.id, savedKey);
         useCouple.getState().replaceWishMeta(wish.id, {
           photo: saved.photo,
           photoPath: saved.photoPath,

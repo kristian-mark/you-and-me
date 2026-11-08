@@ -53,8 +53,10 @@ import { EmptyState, ScreenHeader, UsBadge } from "@/components/ui/shell";
 import { WishPhoto } from "@/components/wish-photo";
 import { useCouple, viewedOwner, viewedWishOwner, type CheckList, type Task, type TaskOwner, type Wish } from "@/lib/couple-store";
 import { leaveSharedPair } from "@/lib/leave-pair";
+import { refreshPairTasks, refreshPairWishes } from "@/lib/pair-live";
 import { deletePairTask } from "@/lib/pair-tasks";
 import { deletePairWish } from "@/lib/pair-wishes";
+import { LIST_POLL_MS, useScreenPoll } from "@/lib/screen-poll";
 import { AccountLogoutButton } from "@/components/account-logout";
 import { saveMyProfile } from "@/lib/pair-server";
 
@@ -64,6 +66,7 @@ function promptTitle(label: string) {
 }
 
 export function TasksScreen() {
+  useScreenPoll("tasks", true, LIST_POLL_MS, refreshPairTasks);
   const tasks = useCouple((s) => s.tasks);
   const toggleTask = useCouple((s) => s.toggleTask);
   const claimTask = useCouple((s) => s.claimTask);
@@ -624,6 +627,7 @@ function Chip({
 }
 
 export function CalendarScreen() {
+  useScreenPoll("tasks", true, LIST_POLL_MS, refreshPairTasks);
   const [cursor, setCursor] = useState(new Date());
   const [selected, setSelected] = useState(format(new Date(), "yyyy-MM-dd"));
   const [mode, setMode] = useState<"overview" | "month" | "week">("overview");
@@ -857,6 +861,7 @@ export function CalendarScreen() {
 }
 
 export function WishesScreen() {
+  useScreenPoll("wishes", true, LIST_POLL_MS, refreshPairWishes);
   const wishes = useCouple((s) => s.wishes);
   const filter = useCouple((s) => s.wishFilter);
   const setFilter = useCouple((s) => s.setWishFilter);

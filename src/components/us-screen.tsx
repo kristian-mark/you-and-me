@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { Camera, ChevronLeft, ChevronRight, Eye, Lock, Shield, Sparkles, X } from "lucide-react";
 import { useCouple, viewedWishOwner, type Person } from "@/lib/couple-store";
 import { leaveSharedPair } from "@/lib/leave-pair";
+import { refreshPairTasks, refreshPairWishes } from "@/lib/pair-live";
+import { LIST_POLL_MS, useScreenPoll } from "@/lib/screen-poll";
 import { togetherDay, anniversaryCountdown } from "@/lib/pair-identity";
 import { saveMyProfile, saveTogetherSince } from "@/lib/pair-server";
 import { AccountLogoutButton } from "@/components/account-logout";
@@ -22,6 +24,8 @@ function personDay(iso: string, noYear?: boolean) {
 }
 
 export function UsScreen({ onClose }: { onClose: () => void }) {
+  useScreenPoll("tasks", true, LIST_POLL_MS, refreshPairTasks);
+  useScreenPoll("wishes", true, LIST_POLL_MS, refreshPairWishes);
   const myName = useCouple((s) => s.myName);
   const partnerName = useCouple((s) => s.partnerName);
   const anniversary = useCouple((s) => s.anniversaryDate);

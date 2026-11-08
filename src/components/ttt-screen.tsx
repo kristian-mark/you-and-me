@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CircleHelp } from "lucide-react";
 import { useCouple } from "@/lib/couple-store";
+import { GAME_POLL_MS, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 import { loadTttMatch, openNewTttMatch, playTttMove } from "@/lib/turn/server";
 import { tttBanner, type TttMatchView } from "@/lib/turn/ttt";
 
@@ -52,7 +53,6 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState(false);
   const [help, setHelp] = useState(false);
-  const [tick, setTick] = useState(0);
   const seenVersion = useRef(-1);
   const busy = useRef(false);
 
@@ -64,33 +64,14 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
     });
   };
 
-  useEffect(() => {
-    let stop = false;
-    const pull = () => {
-      void loadTttMatch()
-        .then((next) => {
-          if (!stop) take(next);
-        })
-        .catch((error: unknown) => {
-          if (!stop) setNotice(textOf(error));
-        });
-    };
-    pull();
-    const timer = window.setInterval(pull, 4000);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") pull();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("focus", onVisible);
-    window.addEventListener("pageshow", onVisible);
-    return () => {
-      stop = true;
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("focus", onVisible);
-      window.removeEventListener("pageshow", onVisible);
-      window.clearInterval(timer);
-    };
-  }, [tick]);
+  useScreenPoll("ttt", true, GAME_POLL_MS, async () => {
+    try {
+      take(await loadTttMatch());
+    } catch (error) {
+      setNotice(textOf(error));
+      throw error;
+    }
+  });
 
   useEffect(() => {
     if (!view) return;
@@ -170,7 +151,7 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
             <div>
               <p className="text-[17px] text-[#e6e1d6]">{notice || "Открываем партию…"}</p>
               {notice ? (
-                <button type="button" onClick={() => setTick((value) => value + 1)} className="mt-4 inline-flex min-h-11 items-center text-[16px] text-cream">
+                <button type="button" onClick={() => void refreshScreen("ttt")} className="mt-4 inline-flex min-h-11 items-center text-[16px] text-cream">
                   Ещё раз
                 </button>
               ) : null}
