@@ -1,19 +1,12 @@
--- Pair data for the couples app. Apply in the Supabase SQL editor.
--- Do not run this against Neon: storage and the anon role live in Supabase.
+-- Additive migration. Safe to run once on the live project, which already has
+-- 20261108064233_app_pair_store and 20261108064235_wish_storage_policies.
 --
--- The app server currently calls PostgREST with the anon key, so anon must
--- keep table and storage API access or the app stops saving. RLS is on so the
--- tables are not left unprotected by default, and the policies below are the
--- widest grant that still lets this server work.
---
--- What this migration does restrict without a service_role key:
---   * wish photos are not world-readable (bucket wishes is private);
---   * a task or wish cannot be moved to another pair_id after insert;
---   * a person cannot be inserted into two pairs at once.
---
--- To actually stop the anon key from reading every row, put a service_role
--- key on the server (it bypasses RLS) and replace the anon_server policies
--- with policies that use auth.uid(). That key is not in this repo.
+-- It does not drop tables, rewrite columns, or delete rows. CREATE/ALTER use
+-- IF NOT EXISTS, policies are created only when that name is absent, and the
+-- wishes bucket is set private without removing objects (the bucket was empty
+-- at inspection). Running this file again is a no-op.
+-- No explicit transaction here: the Supabase migration runner already wraps
+-- each file in one, and a COMMIT inside the file would close that wrapper.
 
 create table if not exists app_profiles (
   user_id text primary key,
@@ -62,6 +55,8 @@ create index if not exists app_pairs_b_user_id_idx on app_pairs (b_user_id);
 create index if not exists app_tasks_pair_id_idx on app_tasks (pair_id);
 create index if not exists app_wishes_pair_id_idx on app_wishes (pair_id);
 
+grant select, insert, update, delete on app_profiles, app_pairs, app_tasks, app_wishes to anon, authenticated;
+
 create or replace function app_lock_pair_id()
 returns trigger
 language plpgsql
@@ -90,11 +85,15 @@ language plpgsql
 as $$
 begin
   if exists (
-    select 1 from app_pairs
-    where id <> new.id
+    select 1 from app_pairs p
+    where p.id <> new.id
       and (
-        a_user_id in (new.a_user_id, new.b_user_id)
-        or b_user_id in (new.a_user_id, new.b_user_id)
+        p.a_user_id = new.a_user_id
+        or p.b_user_id = new.a_user_id
+        or (
+          new.b_user_id is not null
+          and (p.a_user_id = new.b_user_id or p.b_user_id = new.b_user_id)
+        )
       )
   ) then
     raise exception 'user already in a pair';
@@ -113,38 +112,42 @@ alter table app_pairs enable row level security;
 alter table app_tasks enable row level security;
 alter table app_wishes enable row level security;
 
-grant select, insert, update, delete on app_profiles, app_pairs, app_tasks, app_wishes to anon, authenticated;
-
-drop policy if exists app_profiles_anon_server on app_profiles;
-create policy app_profiles_anon_server on app_profiles
-  for all to anon, authenticated
-  using (true)
-  with check (true);
-
-drop policy if exists app_pairs_anon_server on app_pairs;
-create policy app_pairs_anon_server on app_pairs
-  for all to anon, authenticated
-  using (true)
-  with check (true);
-
-drop policy if exists app_tasks_anon_server on app_tasks;
-create policy app_tasks_anon_server on app_tasks
-  for all to anon, authenticated
-  using (true)
-  with check (true);
-
-drop policy if exists app_wishes_anon_server on app_wishes;
-create policy app_wishes_anon_server on app_wishes
-  for all to anon, authenticated
-  using (true)
-  with check (true);
+-- The server still uses the anon key, so these policies stay permissive.
+-- They are added only when missing and are OR-ed with any policy already
+-- installed by the earlier migrations, which keeps current reads and writes
+-- working. Replacing them with auth.uid() checks needs a service_role key.
+do $$
+declare
+  tbl text;
+begin
+  foreach tbl in array array['app_profiles', 'app_pairs', 'app_tasks', 'app_wishes']
+  loop
+    if not exists (
+      select 1 from pg_policies
+      where schemaname = 'public' and tablename = tbl and policyname = tbl || '_anon_server'
+    ) then
+      execute format(
+        'create policy %I on %I for all to anon, authenticated using (true) with check (true)',
+        tbl || '_anon_server',
+        tbl
+      );
+    end if;
+  end loop;
+end $$;
 
 insert into storage.buckets (id, name, public)
 values ('wishes', 'wishes', false)
 on conflict (id) do update set public = false;
 
-drop policy if exists wishes_anon_api on storage.objects;
-create policy wishes_anon_api on storage.objects
-  for all to anon, authenticated
-  using (bucket_id = 'wishes')
-  with check (bucket_id = 'wishes');
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'storage' and tablename = 'objects' and policyname = 'wishes_anon_api'
+  ) then
+    create policy wishes_anon_api on storage.objects
+      for all to anon, authenticated
+      using (bucket_id = 'wishes')
+      with check (bucket_id = 'wishes');
+  end if;
+end $$;
