@@ -16,15 +16,12 @@ import {
   type Side,
   addShip,
   applyCheckerMove,
-  c4Drop,
-  c4Winner,
   cardLabel,
   checkerMoves,
   dotsPlace,
   dotsWinner,
   durakApply,
   durakLegal,
-  emptyC4,
   emptyCheckers,
   emptyDots,
   emptyReversi,
@@ -110,44 +107,6 @@ function Outcome({
         Ещё партию
       </button>
     </div>
-  );
-}
-
-export function ConnectFour({ onBack, onAgain }: { onBack: () => void; onAgain: () => void }) {
-  const pieceClass = usePieceClass();
-  const [board, setBoard] = useState(emptyC4);
-  const [turn, setTurn] = useState<Side>("me");
-  const result = c4Winner(board);
-  useAward(result);
-  return (
-    <Shell title="Четыре в ряд" onBack={onBack}>
-      {result ? null : <Turn side={turn} />}
-      <div className="mx-auto mt-6 grid w-full max-w-[336px] grid-cols-7 gap-1.5 rounded-[24px] bg-raised p-3">
-        {board[0].map((_, col) => (
-          <button
-            key={col}
-            type="button"
-            disabled={Boolean(result || board[0][col])}
-            onClick={() => {
-              const dropped = c4Drop(board, col, turn);
-              if (!dropped) return;
-              setBoard(dropped.board);
-              setTurn(turn === "me" ? "partner" : "me");
-            }}
-            className="grid gap-1.5"
-          >
-            {board.map((row, r) => (
-              <span
-                key={r}
-                className={`aspect-square rounded-full ${row[col] ? pieceClass(row[col] as Side) : "bg-bg"}`}
-              />
-            ))}
-          </button>
-        ))}
-      </div>
-      <p className="mt-3 text-center text-[13px] text-muted">Нажми на столбик — фишка упадёт вниз</p>
-      {result ? <Outcome result={result} onAgain={onAgain} /> : null}
-    </Shell>
   );
 }
 
