@@ -239,6 +239,8 @@ type CoupleState = {
   partnerName: string;
   myUserId: string | null;
   partnerUserId: string | null;
+  /** Signed-in user who owns the persisted rows. Null means the data is unscoped. */
+  localOwnerId: string | null;
   myColor: PieceColor | null;
   partnerColor: PieceColor | null;
   inviteCode: string | null;
@@ -281,6 +283,13 @@ type CoupleState = {
   setMyName: (name: string) => void;
   setPartnerName: (name: string) => void;
   setPairUsers: (mine: string | null, partner: string | null) => void;
+  /**
+   * Same owner: keep. No owner yet: adopt and un-finish a local quiz.
+   * A different owner: drop personal data before any upload.
+   */
+  claimAccount: (userId: string) => "keep" | "adopt" | "drop";
+  /** Drop personal data on sign-out so the next account cannot upload it. */
+  forgetAccount: () => void;
   setSeat: (seat: "a" | "b") => void;
   applyPairSession: (input: {
     pairId: string | null;
@@ -440,6 +449,65 @@ function stamp() {
   return new Date().toISOString();
 }
 
+function blankPersonal(ownerId: string | null): Partial<CoupleState> {
+  return {
+    localOwnerId: ownerId,
+    myUserId: ownerId,
+    partnerUserId: null,
+    pairCode: null,
+    seat: "a",
+    waiting: false,
+    joined: false,
+    myName: FALLBACK_MY_NAME,
+    partnerName: FALLBACK_PARTNER_NAME,
+    myColor: null,
+    partnerColor: null,
+    inviteCode: null,
+    deletedTaskIds: [],
+    deletedWishIds: [],
+    myBirthday: "",
+    partnerBirthday: "",
+    myBirthdayEdits: 0,
+    partnerBirthdayEdits: 0,
+    tab: "tasks",
+    moreOpen: null,
+    tasks: [],
+    events: [],
+    wishes: [],
+    lists: [],
+    notes: [],
+    noteFolders: [],
+    votes: [],
+    capsules: [],
+    anniversaryDate: "",
+    pairedAt: null,
+    gettingMarried: false,
+    weddingDate: "",
+    people: [],
+    quiz: { index: 0, myAnswers: [], partnerAnswers: [], consented: false },
+    daily: { date: "", questionId: "real", skippedIds: [], history: [] },
+    cards: [],
+    chat: [],
+    gameWins: { me: 0, partner: 0 },
+    tttRecord: { me: 0, partner: 0, games: 0 },
+    tttNoted: "",
+    budget: {
+      currency: "USD",
+      txs: [],
+      categories: [],
+      accounts: [],
+      monthLimit: null,
+      monthLimitFrom: null,
+      catLimits: {},
+      limitLog: [],
+      recurring: [],
+      alerts: [],
+    },
+    openTaskId: null,
+    taskReturn: null,
+  };
+}
+
 export const useCouple = create<CoupleState>()(
   persist(
     (set, get) => ({
@@ -451,6 +519,7 @@ export const useCouple = create<CoupleState>()(
       partnerName: FALLBACK_PARTNER_NAME,
       myUserId: null,
       partnerUserId: null,
+      localOwnerId: null,
       myColor: null,
       partnerColor: null,
       inviteCode: null,
@@ -526,6 +595,27 @@ export const useCouple = create<CoupleState>()(
         if (value) set({ partnerName: value });
       },
       setPairUsers: (mine, partner) => set({ myUserId: mine, partnerUserId: partner }),
+      claimAccount: (userId) => {
+        const owner = get().localOwnerId;
+        if (owner === userId) return "keep";
+        if (!owner) {
+          const quiz = get().quiz;
+          set({
+            localOwnerId: userId,
+            myUserId: userId,
+            quiz: {
+              ...quiz,
+              myDoneAt: undefined,
+              partnerDoneAt: undefined,
+              partnerAnswers: [],
+            },
+          });
+          return "adopt";
+        }
+        set(blankPersonal(userId));
+        return "drop";
+      },
+      forgetAccount: () => set(blankPersonal(null)),
       setSeat: (seat) => set({ seat }),
       applyPairSession: (input) => {
         const patch: Partial<CoupleState> = { inviteCode: input.inviteCode };
@@ -1102,6 +1192,7 @@ export const useCouple = create<CoupleState>()(
           inviteCode: raw.inviteCode ?? null,
           deletedTaskIds: raw.deletedTaskIds ?? [],
           deletedWishIds: raw.deletedWishIds ?? [],
+          localOwnerId: typeof raw.localOwnerId === "string" && raw.localOwnerId ? raw.localOwnerId : null,
           myColor: raw.myColor === "blue" || raw.myColor === "pink" ? raw.myColor : null,
           partnerColor: raw.partnerColor === "blue" || raw.partnerColor === "pink" ? raw.partnerColor : null,
           myName: names.myName,

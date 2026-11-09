@@ -25,6 +25,7 @@ import {
 import {
   markTaskSynced,
   markWishSynced,
+  resetSyncMarks,
   taskNeedsUpload,
   taskSyncKey,
   wishNeedsUpload,
@@ -63,6 +64,7 @@ function PairGate() {
   useScreenPoll("pair", canPollProfile, waitingForPartner ? PAIR_WAIT_POLL_MS : PAIR_POLL_MS, async () => {
     try {
       const next = await getMyPair();
+      if (useCouple.getState().claimAccount(next.userId) === "drop") resetSyncMarks();
       setProfile(next);
       setNeedsLogin(false);
       setError("");
@@ -76,6 +78,7 @@ function PairGate() {
         togetherSince: next.togetherSince,
       });
       if (
+        useCouple.getState().localOwnerId === next.userId &&
         next.pairId &&
         !next.togetherSince &&
         localAnniversary &&
@@ -110,6 +113,7 @@ function PairGate() {
         hadPair.current = false;
         leavePair();
       }
+      void refreshCoupleQuiz().catch(() => undefined);
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Облако не ответило";
       if (/unauthor/i.test(raw)) {
@@ -233,10 +237,9 @@ function AppShell() {
   const wishes = useCouple((s) => s.wishes);
   const myUserId = useCouple((s) => s.myUserId);
   const partnerUserId = useCouple((s) => s.partnerUserId);
+  const localOwnerId = useCouple((s) => s.localOwnerId);
   useEffect(() => {
-    void refreshCoupleQuiz().catch(() => undefined);
-  }, []);
-  useEffect(() => {
+    if (!myUserId || localOwnerId !== myUserId) return;
     let stop = false;
     const run = async () => {
       for (const task of tasks) {
@@ -259,9 +262,10 @@ function AppShell() {
     return () => {
       stop = true;
     };
-  }, [tasks, myUserId, partnerUserId]);
+  }, [tasks, myUserId, partnerUserId, localOwnerId]);
 
   useEffect(() => {
+    if (!myUserId || localOwnerId !== myUserId) return;
     let stop = false;
     const run = async () => {
       for (const wish of wishes) {
@@ -291,7 +295,7 @@ function AppShell() {
     return () => {
       stop = true;
     };
-  }, [wishes, myUserId, partnerUserId]);
+  }, [wishes, myUserId, partnerUserId, localOwnerId]);
 
   return (
     <main className="app-frame safe-pad flex min-h-dvh flex-col bg-bg">

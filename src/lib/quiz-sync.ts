@@ -64,12 +64,18 @@ export function remindAllowed(remindedAt: string | null, now: number) {
   return now - at >= REMIND_GAP_MS;
 }
 
+export const NUDGE_WINDOW_MS = 7 * REMIND_GAP_MS;
+
 export function quizNudge(input: {
   myDoneAt?: string | null;
   partnerRemindedAt?: string | null;
   partnerName: string;
+  now?: number;
 }) {
   if (input.myDoneAt || !input.partnerRemindedAt) return null;
+  const at = Date.parse(input.partnerRemindedAt);
+  const now = input.now ?? Date.now();
+  if (Number.isNaN(at) || now - at > NUDGE_WINDOW_MS) return null;
   const name = input.partnerName.trim() || "Партнёр";
   return `${name} ждёт тебя в тесте на совместимость`;
 }
