@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { CircleHelp } from "lucide-react";
 import { useCouple, usePlayerColors } from "@/lib/couple-store";
 import { pieceBorder, pieceText, type PieceColor } from "@/lib/pair-color";
-import { GAME_POLL_MS, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
+import { GAME_POLL_MS, pollFailureNotice, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 import { loadTttMatch, openNewTttMatch, playTttMove } from "@/lib/turn/server";
 import { tttBanner, type TttMatchView } from "@/lib/turn/ttt";
 
@@ -53,6 +53,8 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
   const [help, setHelp] = useState(false);
   const seenVersion = useRef(-1);
   const busy = useRef(false);
+  const pollMisses = useRef(0);
+  const noticeFromPoll = useRef(false);
 
   const take = (next: TttMatchView) => {
     setView((prev) => {
@@ -65,15 +67,28 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
   useScreenPoll("ttt", true, GAME_POLL_MS, async () => {
     try {
       take(await loadTttMatch());
+      pollMisses.current = 0;
+      if (noticeFromPoll.current) {
+        noticeFromPoll.current = false;
+        setNotice("");
+      }
     } catch (error) {
-      setNotice(textOf(error));
+      pollMisses.current += 1;
+      const text = pollFailureNotice(pollMisses.current, textOf(error));
+      if (text) {
+        noticeFromPoll.current = true;
+        setNotice(text);
+      }
       throw error;
     }
   });
 
   useEffect(() => {
     if (!view) return;
-    if (seenVersion.current >= 0 && view.version > seenVersion.current) setNotice("");
+    if (seenVersion.current >= 0 && view.version > seenVersion.current) {
+      noticeFromPoll.current = false;
+      setNotice("");
+    }
     seenVersion.current = view.version;
   }, [view]);
 
@@ -86,12 +101,14 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
     if (busy.current || !view || !view.myTurn || view.board[cell]) return;
     busy.current = true;
     setPending(true);
+    noticeFromPoll.current = false;
     setNotice("");
     void playTttMove({ data: { cell, version: view.version } })
       .then((next) => {
         take(next);
       })
       .catch((error: unknown) => {
+        noticeFromPoll.current = false;
         setNotice(textOf(error));
         return loadTttMatch()
           .then((next) => setView(next))
@@ -107,10 +124,12 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
     if (busy.current || !view || view.status === "active") return;
     busy.current = true;
     setPending(true);
+    noticeFromPoll.current = false;
     setNotice("");
     void openNewTttMatch({ data: { version: view.version } })
       .then((next) => setView(next))
       .catch((error: unknown) => {
+        noticeFromPoll.current = false;
         setNotice(textOf(error));
         return loadTttMatch()
           .then((next) => setView(next))
@@ -126,12 +145,14 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
     if (busy.current || !view || view.status !== "finished") return;
     busy.current = true;
     setPending(true);
+    noticeFromPoll.current = false;
     setNotice("");
     void openNewTttMatch({ data: { version: view.version } })
       .then((next) => {
         take(next);
       })
       .catch((error: unknown) => {
+        noticeFromPoll.current = false;
         setNotice(textOf(error));
         return loadTttMatch()
           .then((next) => setView(next))
