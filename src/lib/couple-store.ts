@@ -274,6 +274,7 @@ type CoupleState = {
   tttRecord: TttRecord;
   tttNoted: string;
   c4Noted: string;
+  dotsNoted: string;
   budget: BudgetState;
   openTaskId: string | null;
   taskReturn: TabId | null;
@@ -355,6 +356,7 @@ type CoupleState = {
   addGameWin: (who: "me" | "partner") => void;
   noteTtt: (winner: "me" | "partner" | "draw", key: string) => void;
   noteC4: (winner: "me" | "partner" | "draw", key: string) => void;
+  noteDots: (winner: "me" | "partner" | "draw", key: string) => void;
   setBudgetCurrency: (code: string) => void;
   addBudgetTx: (input: Omit<BudgetTx, "id" | "createdAt">) => void;
   deleteBudgetTx: (id: string) => void;
@@ -494,6 +496,7 @@ function blankPersonal(ownerId: string | null): Partial<CoupleState> {
     tttRecord: { me: 0, partner: 0, games: 0 },
     tttNoted: "",
     c4Noted: "",
+    dotsNoted: "",
     budget: {
       currency: "USD",
       txs: [],
@@ -561,6 +564,7 @@ export const useCouple = create<CoupleState>()(
       tttRecord: { me: 0, partner: 0, games: 0 },
       tttNoted: "",
       c4Noted: "",
+      dotsNoted: "",
       budget: {
         currency: "USD",
         txs: [],
@@ -1073,6 +1077,17 @@ export const useCouple = create<CoupleState>()(
               : { ...wins, partner: wins.partner + 2 };
         set({ gameWins: nextWins, c4Noted: key });
       },
+      noteDots: (winner, key) => {
+        if (get().dotsNoted === key) return;
+        const wins = get().gameWins ?? { me: 0, partner: 0 };
+        const nextWins =
+          winner === "draw"
+            ? { me: wins.me + 1, partner: wins.partner + 1 }
+            : winner === "me"
+              ? { ...wins, me: wins.me + 2 }
+              : { ...wins, partner: wins.partner + 2 };
+        set({ gameWins: nextWins, dotsNoted: key });
+      },
       setBudgetCurrency: (code) => set({ budget: { ...get().budget, currency: code } }),
       addBudgetTx: (input) => {
         const budget = get().budget;
@@ -1219,6 +1234,7 @@ export const useCouple = create<CoupleState>()(
           tttRecord: raw.tttRecord ?? { me: 0, partner: 0, games: 0 },
           tttNoted: raw.tttNoted ?? "",
           c4Noted: raw.c4Noted ?? "",
+          dotsNoted: raw.dotsNoted ?? "",
           people: raw.people ?? [],
           gettingMarried: raw.gettingMarried ?? false,
           weddingDate: raw.weddingDate ?? "",

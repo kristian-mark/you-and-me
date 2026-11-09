@@ -22,6 +22,16 @@ import {
   type C4State,
 } from "./c4.ts";
 import {
+  beginDots,
+  idleDotsView,
+  newDotsMatch,
+  presentDots,
+  readDotsState,
+  type DotsMatchView,
+  type DotsMove,
+  type DotsState,
+} from "./dots.ts";
+import {
   beginTtt,
   idleTttView,
   newTttMatch,
@@ -238,6 +248,17 @@ const c4Match = createMatch<C4State, C4MatchView>({
   apply: (snapshot, seat, move) => turnGames.c4.apply(snapshot, seat, move as C4Move),
 });
 
+const dotsMatch = createMatch<DotsState, DotsMatchView>({
+  game: turnGames.dots.type,
+  empty: () => turnGames.dots.empty(),
+  read: readDotsState,
+  begin: beginDots,
+  reset: newDotsMatch,
+  present: presentDots,
+  idle: idleDotsView,
+  apply: (snapshot, seat, move) => turnGames.dots.apply(snapshot, seat, move as DotsMove),
+});
+
 function parseVersion(value: unknown) {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 1_000_000_000) {
     throw new Error("Некорректная партия");
@@ -323,6 +344,49 @@ export const openNewC4Match = createServerFn({ method: "POST" })
   .handler(async ({ context, data }): Promise<C4MatchView> => {
     try {
       return await c4Match.open(context.userId, data.version);
+    } catch (error) {
+      textOf(error);
+    }
+  });
+
+export const loadDotsMatch = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }): Promise<DotsMatchView> => {
+    try {
+      return await dotsMatch.load(context.userId);
+    } catch (error) {
+      textOf(error);
+    }
+  });
+
+export const playDotsMove = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: unknown) => {
+    if (!input || typeof input !== "object") throw new Error("Некорректный ход");
+    const raw = input as { kind?: unknown; index?: unknown; version?: unknown };
+    if (raw.kind !== "h" && raw.kind !== "v") throw new Error("Нет такой линии");
+    if (typeof raw.index !== "number" || !Number.isInteger(raw.index) || raw.index < 0 || raw.index > 19) {
+      throw new Error("Нет такой линии");
+    }
+    return { kind: raw.kind, index: raw.index, version: parseVersion(raw.version) };
+  })
+  .handler(async ({ context, data }): Promise<DotsMatchView> => {
+    try {
+      return await dotsMatch.play(context.userId, { kind: data.kind, index: data.index }, data.version);
+    } catch (error) {
+      textOf(error);
+    }
+  });
+
+export const openNewDotsMatch = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: unknown) => {
+    if (!input || typeof input !== "object") throw new Error("Некорректная партия");
+    return { version: parseVersion((input as { version?: unknown }).version) };
+  })
+  .handler(async ({ context, data }): Promise<DotsMatchView> => {
+    try {
+      return await dotsMatch.open(context.userId, data.version);
     } catch (error) {
       textOf(error);
     }

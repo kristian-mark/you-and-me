@@ -1,13 +1,11 @@
-import { Fragment, useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useCouple, usePlayerColors } from "@/lib/couple-store";
 import { pieceBg } from "@/lib/pair-color";
 import {
-  DOTS,
   FLEET_LENGTHS,
   type Bout,
   type CheckerMove,
   type DCard,
-  type DotsState,
   type DurakState,
   type Piece,
   type RevCell,
@@ -18,12 +16,9 @@ import {
   applyCheckerMove,
   cardLabel,
   checkerMoves,
-  dotsPlace,
-  dotsWinner,
   durakApply,
   durakLegal,
   emptyCheckers,
-  emptyDots,
   emptyReversi,
   fireAt,
   newDurak,
@@ -107,81 +102,6 @@ function Outcome({
         Ещё партию
       </button>
     </div>
-  );
-}
-
-export function DotsAndBoxes({ onBack, onAgain }: { onBack: () => void; onAgain: () => void }) {
-  const pieceClass = usePieceClass();
-  const [state, setState] = useState<DotsState>(emptyDots);
-  const result = dotsWinner(state);
-  useAward(result);
-  const play = (kind: "h" | "v", r: number, c: number) => {
-    if (result) return;
-    const next = dotsPlace(state, kind, r, c);
-    if (next) setState(next);
-  };
-  return (
-    <Shell title="Точки и квадраты" onBack={onBack}>
-      {result ? null : <Turn side={state.turn} />}
-      <p className="mt-1 text-[14px] text-muted">
-        {state.scores.me} : {state.scores.partner}
-      </p>
-      <div className="mt-6 overflow-x-auto">
-        {Array.from({ length: DOTS + 1 }, (_, r) => (
-          <Fragment key={r}>
-            <div className="flex items-center">
-              {Array.from({ length: DOTS + 1 }, (_, c) => (
-                <Fragment key={c}>
-                  <span className="size-3 shrink-0 rounded-full bg-muted" />
-                  {c < DOTS ? (
-                    <button
-                      type="button"
-                      aria-label="Линия"
-                      onClick={() => play("h", r, c)}
-                      className="grid h-8 w-11 place-items-center"
-                    >
-                      <span
-                        className={`h-1.5 w-8 rounded-full ${
-                          state.h[r][c] ? pieceClass(state.h[r][c] as Side) : "bg-chip"
-                        }`}
-                      />
-                    </button>
-                  ) : null}
-                </Fragment>
-              ))}
-            </div>
-            {r < DOTS ? (
-              <div className="flex">
-                {Array.from({ length: DOTS + 1 }, (_, c) => (
-                  <Fragment key={c}>
-                    <button
-                      type="button"
-                      aria-label="Линия"
-                      onClick={() => play("v", r, c)}
-                      className="grid h-11 w-3 place-items-center"
-                    >
-                      <span
-                        className={`h-8 w-1.5 rounded-full ${
-                          state.v[r][c] ? pieceClass(state.v[r][c] as Side) : "bg-chip"
-                        }`}
-                      />
-                    </button>
-                    {c < DOTS ? (
-                      <div className="grid h-11 w-11 place-items-center">
-                        {state.boxes[r][c] ? (
-                          <span className={`size-7 rounded-lg ${pieceClass(state.boxes[r][c] as Side)}`} />
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </Fragment>
-                ))}
-              </div>
-            ) : null}
-          </Fragment>
-        ))}
-      </div>
-      {result ? <Outcome result={result} onAgain={onAgain} /> : null}
-    </Shell>
   );
 }
 
