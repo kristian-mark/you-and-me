@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createPollHub, type PollClock } from "./screen-poll.ts";
+import { createPollHub, pollFailureNotice, type PollClock } from "./screen-poll.ts";
 
 function fakeClock(online = true) {
   let now = 0;
@@ -206,6 +206,11 @@ test("changing the interval does not fetch by itself", async () => {
   time.advance(4 * 60 * 60 * 1000 - 5_000);
   await hub.settled();
   assert.equal(calls, 2);
+});
+
+test("one poll miss stays quiet and a second miss is shown", () => {
+  assert.equal(pollFailureNotice(1, "Не удалось проверить аккаунт"), null);
+  assert.equal(pollFailureNotice(2, "Не удалось проверить аккаунт"), "Не удалось проверить аккаунт");
 });
 
 test("refreshOpenScreens is a no-op while hidden and refreshes when visible", async () => {

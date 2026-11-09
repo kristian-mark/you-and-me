@@ -93,7 +93,17 @@ function createNeonSql(): Promise<Sql> {
     types.setTypeParser(OID_INT8, Number);
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool({ connectionString: databaseUrl });
+    const pool = new Pool({
+      connectionString: databaseUrl,
+      // Supabase session mode allows about 15 clients. pg's default of 10,
+      // left idle on each warm instance, plus Better Auth's own pool, filled
+      // that limit during a two-player game poll. The account check then
+      // failed and the match flashed «Не удалось проверить аккаунт».
+      max: 1,
+      idleTimeoutMillis: 1_000,
+      connectionTimeoutMillis: 4_000,
+      allowExitOnIdle: true,
+    });
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
       return res.rows as T[];

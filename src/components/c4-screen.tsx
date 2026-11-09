@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { CircleHelp } from "lucide-react";
 import { useCouple, usePlayerColors } from "@/lib/couple-store";
 import { pieceBg, type PieceColor } from "@/lib/pair-color";
-import { GAME_POLL_MS, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
+import { GAME_POLL_MS, pollFailureNotice, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 import { C4_COLS, C4_ROWS, c4Banner, c4Index, type C4MatchView } from "@/lib/turn/c4";
 import { loadC4Match, openNewC4Match, playC4Move } from "@/lib/turn/server";
 
@@ -25,6 +25,8 @@ export function ConnectFourMatch({ onBack }: { onBack: () => void; onAgain?: () 
   const [help, setHelp] = useState(false);
   const seenVersion = useRef(-1);
   const busy = useRef(false);
+  const pollMisses = useRef(0);
+  const noticeFromPoll = useRef(false);
 
   const take = (next: C4MatchView) => {
     setView((prev) => {
@@ -37,15 +39,28 @@ export function ConnectFourMatch({ onBack }: { onBack: () => void; onAgain?: () 
   useScreenPoll("c4", true, GAME_POLL_MS, async () => {
     try {
       take(await loadC4Match());
+      pollMisses.current = 0;
+      if (noticeFromPoll.current) {
+        noticeFromPoll.current = false;
+        setNotice("");
+      }
     } catch (error) {
-      setNotice(textOf(error));
+      pollMisses.current += 1;
+      const text = pollFailureNotice(pollMisses.current, textOf(error));
+      if (text) {
+        noticeFromPoll.current = true;
+        setNotice(text);
+      }
       throw error;
     }
   });
 
   useEffect(() => {
     if (!view) return;
-    if (seenVersion.current >= 0 && view.version > seenVersion.current) setNotice("");
+    if (seenVersion.current >= 0 && view.version > seenVersion.current) {
+      noticeFromPoll.current = false;
+      setNotice("");
+    }
     seenVersion.current = view.version;
   }, [view]);
 
@@ -63,10 +78,12 @@ export function ConnectFourMatch({ onBack }: { onBack: () => void; onAgain?: () 
     if (busy.current || !view || !view.myTurn || view.board[column]) return;
     busy.current = true;
     setPending(true);
+    noticeFromPoll.current = false;
     setNotice("");
     void playC4Move({ data: { column, version: view.version } })
       .then((next) => take(next))
       .catch((error: unknown) => {
+        noticeFromPoll.current = false;
         setNotice(textOf(error));
         return reconcile();
       })
@@ -80,10 +97,12 @@ export function ConnectFourMatch({ onBack }: { onBack: () => void; onAgain?: () 
     if (busy.current || !view || view.status === "active") return;
     busy.current = true;
     setPending(true);
+    noticeFromPoll.current = false;
     setNotice("");
     void openNewC4Match({ data: { version: view.version } })
       .then((next) => setView(next))
       .catch((error: unknown) => {
+        noticeFromPoll.current = false;
         setNotice(textOf(error));
         return reconcile();
       })
