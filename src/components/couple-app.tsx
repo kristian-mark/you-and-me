@@ -153,8 +153,6 @@ function PairGate() {
 
   if (!profile.partner) {
     return (
-      <>
-      <LoginNotice />
       <InviteScreen
         profile={profile}
         error={error}
@@ -169,16 +167,10 @@ function PairGate() {
           }
         }}
       />
-      </>
     );
   }
 
-  return (
-    <>
-      <LoginNotice />
-      <AppShell />
-    </>
-  );
+  return <AppShell />;
 }
 
 function InviteScreen({
@@ -200,6 +192,7 @@ function InviteScreen({
 
   return (
     <main className="app-frame safe-pad flex min-h-dvh flex-col px-5 pt-12 pb-10">
+      <LoginNotice className="pt-3" />
       <div>
         <h1 className="text-[34px] font-semibold tracking-tight">Мы</h1>
       </div>
@@ -308,6 +301,15 @@ function AppShell() {
 
   return (
     <main className="app-frame safe-pad flex min-h-dvh min-w-0 flex-col bg-bg">
+      <LoginNotice
+        onOpenHistory={() => {
+          useCouple.getState().setTab("more");
+          useCouple.getState().setMore("settings");
+          window.setTimeout(() => {
+            document.getElementById("login-history")?.scrollIntoView({ block: "start" });
+          }, 80);
+        }}
+      />
       {tab === "tasks" ? <TasksScreen /> : null}
       {tab === "calendar" ? <CalendarScreen /> : null}
       {tab === "wishes" ? <WishesScreen /> : null}

@@ -1,13 +1,20 @@
-import { useEffect, useState } from "react";
-import { loadLoginNotice } from "@/lib/login-server";
-import { formatLoginWhen, loginBannerText } from "@/lib/login-device";
+import { useEffect, useRef, useState } from "react";
+import { dismissLoginNotice, loadLoginNotice } from "@/lib/login-server";
+import { formatLoginWhen, loginBannerText, loginDetailText, loginGroupTitle } from "@/lib/login-device";
 import { authEnabled } from "@/lib/auth/client";
 
 type Notice = Awaited<ReturnType<typeof loadLoginNotice>>[number];
 
-/** Other sessions only. Runs on open and when the tab becomes visible, not on the game poll. */
-export function LoginNotice() {
+/** Other sessions only, and only logins newer than this one. Open and focus, not the game poll. */
+export function LoginNotice({
+  onOpenHistory,
+  className = "px-5 pt-3",
+}: {
+  onOpenHistory?: () => void;
+  className?: string;
+}) {
   const [items, setItems] = useState<Notice[]>([]);
+  const hidden = useRef(new Set<string>());
 
   useEffect(() => {
     if (!authEnabled) return;
@@ -18,7 +25,8 @@ export function LoginNotice() {
       timer = window.setTimeout(() => {
         void loadLoginNotice()
           .then((rows) => {
-            if (!stop && rows.length) setItems(rows);
+            if (stop) return;
+            setItems(rows.filter((row) => !hidden.current.has(row.id)));
           })
           .catch(() => undefined);
       }, 400);
@@ -38,28 +46,41 @@ export function LoginNotice() {
   }, []);
 
   if (!items.length) return null;
+  const latest = items[0];
+  const when = formatLoginWhen(latest.createdAt);
+  const detail = { device: latest.device, city: latest.city, country: latest.country, ip: latest.ip, when };
+  const hide = () => {
+    const ids = items.map((item) => item.id);
+    ids.forEach((id) => hidden.current.add(id));
+    setItems([]);
+    void dismissLoginNotice({ data: ids }).catch(() => undefined);
+  };
+
   return (
-    <div className="fixed inset-x-3 top-3 z-50 mx-auto flex max-w-lg flex-col gap-2">
-      {items.map((item) => (
-        <div key={item.id} className="rounded-[22px] bg-raised px-4 py-3 shadow-lg">
-          <p className="text-[14px] leading-5 break-words">
-            {loginBannerText({
-              device: item.device,
-              city: item.city,
-              country: item.country,
-              ip: item.ip,
-              when: formatLoginWhen(item.createdAt),
-            })}
-          </p>
-          <button
-            type="button"
-            onClick={() => setItems((list) => list.filter((row) => row.id !== item.id))}
-            className="mt-2 min-h-11 text-[14px] text-muted"
-          >
+    <div className={className}>
+      <div className="rounded-[22px] bg-raised px-4 py-3">
+        <p className="text-[15px] leading-5 font-semibold break-words">
+          {items.length > 1 ? loginGroupTitle(items.length) : loginBannerText(detail)}
+        </p>
+        {items.length > 1 ? <p className="mt-1 text-[14px] leading-5 break-words text-[#e6e1d6]">{loginDetailText(detail)}</p> : null}
+        <div className="mt-1 flex flex-wrap gap-x-4">
+          {items.length > 1 && onOpenHistory ? (
+            <button
+              type="button"
+              onClick={() => {
+                hide();
+                onOpenHistory();
+              }}
+              className="min-h-11 text-[15px] text-cream"
+            >
+              Подробнее
+            </button>
+          ) : null}
+          <button type="button" onClick={hide} className="min-h-11 text-[15px] text-muted">
             Скрыть
           </button>
         </div>
-      ))}
+      </div>
     </div>
   );
 }

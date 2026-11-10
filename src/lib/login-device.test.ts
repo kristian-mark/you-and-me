@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { clientIp, clientPlace, deviceLabel, formatLoginWhen, loginBannerText } from "./login-device.ts";
+import { clientIp, clientPlace, deviceLabel, formatLoginWhen, loginBannerText, loginGroupTitle } from "./login-device.ts";
 
 const IPHONE_SAFARI =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
@@ -46,4 +46,5 @@ test("banner uses the viewer's timezone and skips a missing place", () => {
     }),
     "Вход в аккаунт: iPhone · Safari, Чикаго, IP 1.2.3.4, 10 ноября в 15:20",
   );
+  assert.equal(loginGroupTitle(3), "Новые входы в аккаунт: 3");
 });

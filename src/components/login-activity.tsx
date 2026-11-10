@@ -12,6 +12,7 @@ function line(item: { device: string; city: string | null; country: string | nul
 export function LoginActivity() {
   const [data, setData] = useState<Activity | null>(null);
   const [busy, setBusy] = useState("");
+  const [confirmAll, setConfirmAll] = useState(false);
 
   const reload = () => {
     void loadLoginActivity()
@@ -55,22 +56,48 @@ export function LoginActivity() {
           </li>
         ))}
       </ul>
-      <button
-        type="button"
-        disabled={!others.length || busy === "all"}
-        onClick={() => {
-          setBusy("all");
-          void finishOtherLoginSessions()
-            .then(reload)
-            .finally(() => setBusy(""));
-        }}
-        className="mt-2 min-h-11 w-full rounded-full bg-bg text-[15px] font-semibold disabled:opacity-40"
-      >
-        Выйти со всех других устройств
-      </button>
+      {confirmAll ? (
+        <div className="mt-3 rounded-2xl bg-bg px-4 py-4">
+          <p className="text-[15px] leading-5">Выйти на всех других устройствах? Этот останется в аккаунте.</p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmAll(false)}
+              className="min-h-11 rounded-full border border-line text-[15px]"
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              disabled={busy === "all"}
+              onClick={() => {
+                setBusy("all");
+                void finishOtherLoginSessions()
+                  .then(() => {
+                    setConfirmAll(false);
+                    reload();
+                  })
+                  .finally(() => setBusy(""));
+              }}
+              className="min-h-11 rounded-full bg-cream text-[15px] font-semibold text-cream-fg disabled:opacity-40"
+            >
+              Выйти
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={!others.length}
+          onClick={() => setConfirmAll(true)}
+          className="mt-2 min-h-11 w-full rounded-full bg-bg text-[15px] font-semibold disabled:opacity-40"
+        >
+          Выйти со всех других устройств
+        </button>
+      )}
       <p className="mt-3 text-[13px] leading-5 text-muted">Не вы? Смените пароль</p>
 
-      <p className="mt-6 text-[13px] text-muted">История входов</p>
+      <p id="login-history" className="mt-6 text-[13px] text-muted">История входов</p>
       {data && data.history.length === 0 ? <p className="mt-3 text-[15px] text-muted">Пока пусто</p> : null}
       <ul className="mt-2">
         {data?.history.map((item) => (

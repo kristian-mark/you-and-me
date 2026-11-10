@@ -67,8 +67,11 @@ function iso(value: unknown) {
   return new Date().toISOString();
 }
 
-/** Unseen logins from other sessions, marked seen for this session in the same query. */
-export async function takeUnseenLogins(userId: string, sessionId: string): Promise<LoginNotice[]> {
+/**
+ * Unseen logins from other sessions that happened after this session started.
+ * Ended sessions still count. Older logins do not. Nothing is marked seen here.
+ */
+export async function listUnseenLogins(userId: string, sessionId: string): Promise<LoginNotice[]> {
   const sql = await getSql();
   const rows = await sql.query<{
     id: string;
@@ -78,17 +81,16 @@ export async function takeUnseenLogins(userId: string, sessionId: string): Promi
     city: string | null;
     country: string | null;
   }>(
-    `update login_events
-     set seen_by = seen_by || array[$2]::text[]
-     where id in (
-       select id from login_events
-       where user_id = $1
-         and session_id <> $2
-         and not (seen_by @> array[$2]::text[])
-       order by created_at desc
-       limit 5
-     )
-     returning id, created_at, ip, device_label, city, country`,
+    `select e.id, e.created_at, e.ip, e.device_label, e.city, e.country
+     from login_events e
+     where e.user_id = $1
+       and e.session_id <> $2
+       and e.created_at > (
+         select s."createdAt" from "session" s where s."id" = $2 and s."userId" = $1
+       )
+       and not (e.seen_by @> array[$2]::text[])
+     order by e.created_at desc
+     limit 50`,
     [userId, sessionId],
   );
   return rows.map((row) => ({
@@ -99,6 +101,20 @@ export async function takeUnseenLogins(userId: string, sessionId: string): Promi
     city: row.city,
     country: row.country,
   }));
+}
+
+/** «Скрыть» and «Подробнее» mark every banner row seen for this session. */
+export async function markLoginsSeen(userId: string, sessionId: string, ids: string[]) {
+  if (!ids.length) return;
+  const sql = await getSql();
+  await sql.query(
+    `update login_events
+     set seen_by = seen_by || array[$2]::text[]
+     where user_id = $1
+       and id = any($3::text[])
+       and not (seen_by @> array[$2]::text[])`,
+    [userId, sessionId, ids],
+  );
 }
 
 export type ActiveLogin = {

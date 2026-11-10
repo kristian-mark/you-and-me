@@ -70,7 +70,7 @@ export function formatLoginWhen(iso: string, timeZone?: string) {
   return `${day} в ${time.replace(/\s/g, "")}`;
 }
 
-export function loginBannerText(input: {
+export function loginDetailText(input: {
   device: string;
   city: string | null;
   country: string | null;
@@ -78,6 +78,19 @@ export function loginBannerText(input: {
   when: string;
 }) {
   const place = input.city || input.country || "";
-  const parts = [input.device, place, input.ip ? `IP ${input.ip}` : "", input.when].filter(Boolean);
-  return `Вход в аккаунт: ${parts.join(", ")}`;
+  return [input.device, place, input.ip ? `IP ${input.ip}` : "", input.when].filter(Boolean).join(", ");
+}
+
+export function loginBannerText(input: {
+  device: string;
+  city: string | null;
+  country: string | null;
+  ip: string | null;
+  when: string;
+}) {
+  return `Вход в аккаунт: ${loginDetailText(input)}`;
+}
+
+export function loginGroupTitle(count: number) {
+  return `Новые входы в аккаунт: ${count}`;
 }

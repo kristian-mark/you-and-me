@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getAuthSession } from "@/lib/auth/verify.server";
-import { endLoginSession, endOtherLoginSessions, listLoginActivity, takeUnseenLogins } from "@/lib/login-events.server";
+import { endLoginSession, endOtherLoginSessions, listLoginActivity, listUnseenLogins, markLoginsSeen } from "@/lib/login-events.server";
 
 async function currentSession(bearerToken?: string) {
   const session = await getAuthSession(bearerToken);
@@ -14,7 +14,16 @@ export const loadLoginNotice = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const session = await currentSession(context.bearerToken);
     if (!session || session.userId !== context.userId) return [];
-    return takeUnseenLogins(session.userId, session.sessionId);
+    return listUnseenLogins(session.userId, session.sessionId);
+  });
+
+export const dismissLoginNotice = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((ids: string[]) => ids.map((id) => id.trim()).filter(Boolean).slice(0, 50))
+  .handler(async ({ data, context }) => {
+    const session = await currentSession(context.bearerToken);
+    if (!session || session.userId !== context.userId) return;
+    await markLoginsSeen(session.userId, session.sessionId, data);
   });
 
 export const loadLoginActivity = createServerFn({ method: "POST" })
