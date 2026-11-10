@@ -61,6 +61,11 @@ export function getBearerToken(): string | null {
   }
 }
 
+/** Drop a preview bearer so a fresh session cookie is not overridden by a revoked token. */
+export function clearBearerToken() {
+  setBearerToken(null);
+}
+
 function setBearerToken(token: string | null): void {
   if (typeof window === "undefined") return;
   try {

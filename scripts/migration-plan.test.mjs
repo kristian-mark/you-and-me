@@ -62,6 +62,7 @@ test("globbed migrations apply once, including the auth lock", () => {
   const names = pending.map((item) => item.name);
   assert.ok(names.includes("0001_auth.sql"));
   assert.ok(names.includes("0005_secure_auth_tables_rls.sql"));
+  assert.ok(names.includes("0006_login_events.sql"));
   assert.deepEqual(pendingMigrations(readdirSync(migrationsDir), names), []);
   assert.ok(readdirSync(join(migrationsDir, "auth")).includes("0001_auth.sql"));
   const lock = readFileSync(join(migrationsDir, "0005_secure_auth_tables_rls.sql"), "utf8").toLowerCase();

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { BirthdayPicker } from "@/components/birthday-picker";
+import { LoginNotice } from "@/components/login-notice";
 import {
   CalendarScreen,
   ListsScreen,
@@ -152,6 +153,8 @@ function PairGate() {
 
   if (!profile.partner) {
     return (
+      <>
+      <LoginNotice />
       <InviteScreen
         profile={profile}
         error={error}
@@ -166,10 +169,16 @@ function PairGate() {
           }
         }}
       />
+      </>
     );
   }
 
-  return <AppShell />;
+  return (
+    <>
+      <LoginNotice />
+      <AppShell />
+    </>
+  );
 }
 
 function InviteScreen({
