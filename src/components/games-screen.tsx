@@ -2,9 +2,9 @@ import { useState } from "react";
 import { ChevronRight, Circle, Contrast, Grid3x3, Hash, Sailboat, Spade, Square } from "lucide-react";
 import { ConnectFourMatch } from "@/components/c4-screen";
 import { DotsMatch } from "@/components/dots-screen";
+import { CheckersMatch } from "@/components/checkers-screen";
 import {
   Battleship,
-  Checkers,
   Durak,
 } from "@/components/games-play";
 import { ReversiMatch } from "@/components/reversi-screen";
@@ -17,7 +17,7 @@ const GAMES = [
   { id: "c4", title: "Четыре в ряд", icon: Square, Screen: ConnectFourMatch },
   { id: "dots", title: "Точки и квадраты", icon: Grid3x3, Screen: DotsMatch },
   { id: "reversi", title: "Реверси", icon: Contrast, Screen: ReversiMatch },
-  { id: "checkers", title: "Шашки", icon: Circle, Screen: Checkers },
+  { id: "checkers", title: "Шашки", icon: Circle, Screen: CheckersMatch },
   { id: "sea", title: "Морской бой", icon: Sailboat, Screen: Battleship },
   { id: "durak", title: "Дурак", icon: Spade, Screen: Durak },
 ] as const;
@@ -75,7 +75,7 @@ export function GamesScreen({ onBack }: { onBack: () => void }) {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[17px]">{item.title}</span>
-                <span className="block text-[13px] text-muted">{item.id === "ttt" || item.id === "c4" || item.id === "dots" || item.id === "reversi" ? "По очереди, когда удобно" : "Новая игра"}</span>
+                <span className="block text-[13px] text-muted">{item.id === "ttt" || item.id === "c4" || item.id === "dots" || item.id === "reversi" || item.id === "checkers" ? "По очереди, когда удобно" : "Новая игра"}</span>
               </span>
               <ChevronRight className="size-4 shrink-0 text-muted" />
             </button>

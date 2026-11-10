@@ -32,6 +32,17 @@ import {
   type DotsState,
 } from "./dots.ts";
 import {
+  beginCheckers,
+  idleCheckersView,
+  newCheckersMatch,
+  presentCheckers,
+  readCheckersState,
+  repairMisplacedOpening,
+  type CheckersMatchView,
+  type CheckersMove,
+  type CheckersState,
+} from "./checkers.ts";
+import {
   beginReversi,
   idleRevView,
   newReversiMatch,
@@ -166,6 +177,7 @@ type MatchKit<TState, TView> = {
   present: (snapshot: TurnSnapshot<TState>, version: number, seat: Seat, updatedAt: string | null) => TView;
   idle: () => TView;
   apply: (snapshot: TurnSnapshot<TState>, seat: Seat, move: unknown) => TurnStep<TState>;
+  repair?: (snapshot: TurnSnapshot<TState>) => TurnStep<TState> | null;
 };
 
 function createMatch<TState, TView>(kit: MatchKit<TState, TView>) {
@@ -177,6 +189,24 @@ function createMatch<TState, TView>(kit: MatchKit<TState, TView>) {
     const row = await loadRow(pairId, kit.game);
     if (!row) return kit.idle();
     const { snapshot, version } = toSnapshot(row, pair, kit.read);
+    if (kit.repair && snapshot.turn) {
+      const step = kit.repair(snapshot);
+      if (step) {
+        const now = new Date().toISOString();
+        const saved = await compareAndSwap(
+          pairId,
+          kit.game,
+          version,
+          `status=eq.active&${eqFilter("turn_user_id", userOf(pair, snapshot.turn))}`,
+          fields(pair, step, version + 1, now),
+        );
+        if (saved) return show(step, version + 1, seat, saved.updated_at ?? now);
+        const fresh = await loadRow(pairId, kit.game);
+        if (!fresh) return kit.idle();
+        const again = toSnapshot(fresh, pair, kit.read);
+        return kit.present(again.snapshot, again.version, seat, fresh.updated_at ?? null);
+      }
+    }
     return kit.present(snapshot, version, seat, row.updated_at ?? null);
   }
 
@@ -256,6 +286,18 @@ const c4Match = createMatch<C4State, C4MatchView>({
   present: presentC4,
   idle: idleC4View,
   apply: (snapshot, seat, move) => turnGames.c4.apply(snapshot, seat, move as C4Move),
+});
+
+const checkersMatch = createMatch<CheckersState, CheckersMatchView>({
+  game: turnGames.checkers.type,
+  empty: () => turnGames.checkers.empty(),
+  read: readCheckersState,
+  begin: beginCheckers,
+  reset: newCheckersMatch,
+  present: presentCheckers,
+  idle: idleCheckersView,
+  apply: (snapshot, seat, move) => turnGames.checkers.apply(snapshot, seat, move as CheckersMove),
+  repair: repairMisplacedOpening,
 });
 
 const reversiMatch = createMatch<RevState, RevMatchView>({
@@ -450,6 +492,48 @@ export const openNewReversiMatch = createServerFn({ method: "POST" })
   .handler(async ({ context, data }): Promise<RevMatchView> => {
     try {
       return await reversiMatch.open(context.userId, data.version);
+    } catch (error) {
+      textOf(error);
+    }
+  });
+
+export const loadCheckersMatch = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }): Promise<CheckersMatchView> => {
+    try {
+      return await checkersMatch.load(context.userId);
+    } catch (error) {
+      textOf(error);
+    }
+  });
+
+export const playCheckersMove = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: unknown) => {
+    if (!input || typeof input !== "object") throw new Error("Некорректный ход");
+    const raw = input as { from?: unknown; to?: unknown; version?: unknown };
+    const square = (value: unknown) =>
+      typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 63;
+    if (!square(raw.from) || !square(raw.to) || raw.from === raw.to) throw new Error("Нет такой клетки");
+    return { from: raw.from as number, to: raw.to as number, version: parseVersion(raw.version) };
+  })
+  .handler(async ({ context, data }): Promise<CheckersMatchView> => {
+    try {
+      return await checkersMatch.play(context.userId, { from: data.from, to: data.to }, data.version);
+    } catch (error) {
+      textOf(error);
+    }
+  });
+
+export const openNewCheckersMatch = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: unknown) => {
+    if (!input || typeof input !== "object") throw new Error("Некорректная партия");
+    return { version: parseVersion((input as { version?: unknown }).version) };
+  })
+  .handler(async ({ context, data }): Promise<CheckersMatchView> => {
+    try {
+      return await checkersMatch.open(context.userId, data.version);
     } catch (error) {
       textOf(error);
     }

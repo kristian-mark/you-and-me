@@ -1,4 +1,5 @@
 import { c4Rules } from "./c4.ts";
+import { checkersRules } from "./checkers.ts";
 import { dotsRules } from "./dots.ts";
 import { reversiRules } from "./reversi.ts";
 import { tttRules } from "./ttt.ts";
@@ -10,6 +11,7 @@ export const turnGames = {
   c4: c4Rules,
   dots: dotsRules,
   reversi: reversiRules,
+  checkers: checkersRules,
 } as const;
 
 export type TurnGameType = keyof typeof turnGames;
