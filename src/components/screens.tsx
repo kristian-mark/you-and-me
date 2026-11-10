@@ -61,6 +61,8 @@ import { deletePairTask } from "@/lib/pair-tasks";
 import { deletePairWish } from "@/lib/pair-wishes";
 import { LIST_POLL_MS, useScreenPoll } from "@/lib/screen-poll";
 import { AccountLogoutButton } from "@/components/account-logout";
+import { LoginActivity } from "@/components/login-activity";
+import { PasswordSettings } from "@/components/password-settings";
 import { saveMyProfile } from "@/lib/pair-server";
 
 function promptTitle(label: string) {
@@ -1682,6 +1684,8 @@ function BirthdaySettings({ onBack }: { onBack: () => void }) {
       </button>
       <h1 className="mt-5 text-[34px] font-semibold tracking-tight">Настройки</h1>
       <AccountLogoutButton />
+      <PasswordSettings />
+      <LoginActivity />
       <ColorChoice />
       <div className="mt-4 rounded-[22px] bg-raised px-5 py-5">
         <p className="text-[13px] text-muted">Твой код</p>

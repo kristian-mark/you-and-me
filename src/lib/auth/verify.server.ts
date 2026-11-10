@@ -55,6 +55,22 @@ export type VerifiedUser = { id: string; email: string | null };
  * as a bearer token, which we present as `Authorization: Bearer …` (the `bearer`
  * plugin resolves it). When deployed no token is passed and the cookie is used.
  */
+export async function getAuthSession(
+  bearerToken?: string,
+): Promise<{ userId: string; sessionId: string } | null> {
+  if (!authConfigured && !gateIdentityEnabled()) return null;
+  const request = getRequest();
+  if (!request) return null;
+  let headers = request.headers;
+  if (bearerToken) {
+    headers = new Headers(request.headers);
+    headers.set("Authorization", `Bearer ${bearerToken}`);
+  }
+  const session = await auth.api.getSession({ headers });
+  if (!session?.user?.id || !session.session?.id) return null;
+  return { userId: session.user.id, sessionId: session.session.id };
+}
+
 export async function getSessionUser(
   bearerToken?: string,
 ): Promise<VerifiedUser | null> {

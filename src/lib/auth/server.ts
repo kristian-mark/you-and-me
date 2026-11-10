@@ -36,6 +36,7 @@ import { getCookie } from "@tanstack/react-start/server";
 import { randomBytes } from "node:crypto";
 import { ensureDbReady, getPglite } from "../db";
 import { getSharedPgPool } from "../pg-pool";
+import { recordLoginEvent } from "../login-events.server";
 import { emailAndPasswordEnabled } from "./email-password";
 import { GATE_PROVIDER_ID, gateIdentitySessions } from "./gate-session.server";
 import { GROK_PROVIDERS } from "./providers";
@@ -227,6 +228,28 @@ export const auth = betterAuth({
   // stay signed in until maxAge, and the app would create a profile for that id.
   session: { cookieCache: { enabled: false } },
 
+  databaseHooks: {
+    session: {
+      create: {
+        after: async (session, context) => {
+          try {
+            await recordLoginEvent(
+              {
+                id: session.id,
+                userId: session.userId,
+                ipAddress: session.ipAddress,
+                userAgent: session.userAgent,
+              },
+              context,
+            );
+          } catch (error) {
+            console.error("[auth] could not record the login", error);
+          }
+        },
+      },
+    },
+  },
+
   // Production turns this on. The counter lives in memory on each instance,
   // keyed by IP and path, so two phones on one home connection share a bucket
   // only when they hit the same instance. Reading the session is not limited.
@@ -259,6 +282,9 @@ export const auth = betterAuth({
   advanced: {
     useSecureCookies: false,
     defaultCookieAttributes: { secure: true, sameSite: "lax", path: "/" },
+    ipAddress: {
+      ipAddressHeaders: ["x-forwarded-for", "x-real-ip"],
+    },
     cookies: {
       session_token: { name: SESSION_TOKEN_COOKIE },
       session_data: { name: "__Host-grok-auth.session_data" },
@@ -274,13 +300,15 @@ export const auth = betterAuth({
     // to the broker with the SAME client and differing only by the `idp` hint.
     ...(grokOAuthPlugin ? [grokOAuthPlugin] : []),
 
-    // Accept `Authorization: Bearer <session-token>` as an alternative to the
-    // cookie. Needed for the LIVE PREVIEW: the app runs in an embedded iframe
-    // where cookies are partitioned, so after popup sign-in it authenticates with
-    // a bearer token instead (see `client.ts` / the `auth` skill). The hook only
-    // fires when an Authorization header is present, so the cookie path
-    // (deployed apps) is unaffected.
-    bearer(),
+    // Accept `Authorization: Bearer <signed session cookie>` as an alternative
+    // to the cookie. Needed for the LIVE PREVIEW: the app runs in an embedded
+    // iframe where cookies are partitioned, so after popup sign-in it
+    // authenticates with the signed session cookie posted back by the popup
+    // (see `client.ts`). The hook only fires when an Authorization header is
+    // present, so deployed login still uses the session cookie alone.
+    // requireSignature rejects a raw session.token copied out of the database;
+    // the popup token is the signed cookie value and still verifies.
+    bearer({ requireSignature: true }),
 
     // Bridges Better Auth's Set-Cookie into TanStack Start responses. MUST be
     // last so it runs after every other plugin's hooks.
