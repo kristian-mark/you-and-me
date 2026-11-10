@@ -6,7 +6,9 @@ import {
   checkersRules,
   checkIndex,
   emptyCheckersState,
+  legalSteps,
   presentCheckers,
+  repairMisplacedOpening,
   type CheckCell,
   type CheckersState,
 } from "./checkers.ts";
@@ -76,6 +78,27 @@ test("the partner starts the rematch on their own side", () => {
   assert.equal(viewA.board[checkIndex(5, 0)], "me");
   assert.equal(viewA.board[checkIndex(0, 1)], "partner");
   assert.equal(viewA.moves.length, 0);
+});
+
+test("an untouched rematch that put the partner on the wrong side is restored", () => {
+  const bad = emptyCheckersState();
+  bad.starter = "b";
+  for (let row = 0; row < 8; row += 1) {
+    for (let column = 0; column < 8; column += 1) {
+      if ((row + column) % 2 === 0) continue;
+      const index = checkIndex(row, column);
+      if (row < 3) bad.board[index] = "a";
+      else if (row > 4) bad.board[index] = "b";
+    }
+  }
+  const fixed = repairMisplacedOpening({ state: bad, status: "active", turn: "b", winner: null });
+  assert.ok(fixed);
+  assert.equal(fixed.state.board[checkIndex(2, 1)], "b");
+  assert.equal(fixed.state.board[checkIndex(5, 0)], "a");
+  assert.equal(fixed.turn, "b");
+  assert.ok(legalSteps(fixed.state.board, "b", null).length > 0);
+  const good = beginCheckers(emptyCheckersState(), "b");
+  assert.equal(repairMisplacedOpening({ state: good.state, status: "active", turn: "b", winner: null }), null);
 });
 
 test("a capture is forced, including backward, and a quiet step is refused", () => {

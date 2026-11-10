@@ -299,6 +299,34 @@ export const checkersRules: TurnRules<CheckersState, CheckersMove> = {
   },
 };
 
+/**
+ * A rematch started by seat b used to put their men on rows 5–7.
+ * They then faced the wrong way and had no move. Put that untouched
+ * opening back on the fixed sides and leave the turn with them.
+ */
+export function repairMisplacedOpening(snapshot: TurnSnapshot<CheckersState>): TurnStep<CheckersState> | null {
+  if (snapshot.status !== "active" || snapshot.turn !== "b" || snapshot.state.starter !== "b") return null;
+  if (snapshot.state.chain != null || snapshot.state.quietKing !== 0 || snapshot.state.last) return null;
+  for (let row = 0; row < CHECK_SIZE; row += 1) {
+    for (let column = 0; column < CHECK_SIZE; column += 1) {
+      const cell = snapshot.state.board[checkIndex(row, column)];
+      const dark = (row + column) % 2 === 1;
+      if (!dark) {
+        if (cell) return null;
+        continue;
+      }
+      const expected = row < 3 ? "a" : row > 4 ? "b" : null;
+      if (cell !== expected) return null;
+    }
+  }
+  return {
+    state: { ...snapshot.state, board: placeOpening(), last: null, chain: null },
+    status: "active",
+    turn: "b",
+    winner: null,
+  };
+}
+
 export function beginCheckers(previous: CheckersState, seat: Seat): TurnStep<CheckersState> {
   if (previous.board.some((cell) => cell !== null)) throw new TurnRuleError("illegal", "Партия уже начата");
   return {

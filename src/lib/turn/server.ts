@@ -37,6 +37,7 @@ import {
   newCheckersMatch,
   presentCheckers,
   readCheckersState,
+  repairMisplacedOpening,
   type CheckersMatchView,
   type CheckersMove,
   type CheckersState,
@@ -176,6 +177,7 @@ type MatchKit<TState, TView> = {
   present: (snapshot: TurnSnapshot<TState>, version: number, seat: Seat, updatedAt: string | null) => TView;
   idle: () => TView;
   apply: (snapshot: TurnSnapshot<TState>, seat: Seat, move: unknown) => TurnStep<TState>;
+  repair?: (snapshot: TurnSnapshot<TState>) => TurnStep<TState> | null;
 };
 
 function createMatch<TState, TView>(kit: MatchKit<TState, TView>) {
@@ -187,6 +189,24 @@ function createMatch<TState, TView>(kit: MatchKit<TState, TView>) {
     const row = await loadRow(pairId, kit.game);
     if (!row) return kit.idle();
     const { snapshot, version } = toSnapshot(row, pair, kit.read);
+    if (kit.repair && snapshot.turn) {
+      const step = kit.repair(snapshot);
+      if (step) {
+        const now = new Date().toISOString();
+        const saved = await compareAndSwap(
+          pairId,
+          kit.game,
+          version,
+          `status=eq.active&${eqFilter("turn_user_id", userOf(pair, snapshot.turn))}`,
+          fields(pair, step, version + 1, now),
+        );
+        if (saved) return show(step, version + 1, seat, saved.updated_at ?? now);
+        const fresh = await loadRow(pairId, kit.game);
+        if (!fresh) return kit.idle();
+        const again = toSnapshot(fresh, pair, kit.read);
+        return kit.present(again.snapshot, again.version, seat, fresh.updated_at ?? null);
+      }
+    }
     return kit.present(snapshot, version, seat, row.updated_at ?? null);
   }
 
@@ -277,6 +297,7 @@ const checkersMatch = createMatch<CheckersState, CheckersMatchView>({
   present: presentCheckers,
   idle: idleCheckersView,
   apply: (snapshot, seat, move) => turnGames.checkers.apply(snapshot, seat, move as CheckersMove),
+  repair: repairMisplacedOpening,
 });
 
 const reversiMatch = createMatch<RevState, RevMatchView>({
