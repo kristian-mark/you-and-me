@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { GROK_PROVIDERS, authClient, authEnabled, signIn } from "@/lib/auth/client";
+import { userMessage } from "@/lib/user-message";
 
 export const Route = createFileRoute("/login")({ component: Login });
 
@@ -65,7 +66,7 @@ function Login() {
     const { error: fail } = await run;
     setBusy(false);
     if (fail) {
-      setError(fail.message ?? "Не вышло");
+      setError(userMessage(fail, "Не вышло"));
       return;
     }
     void navigate({ to: "/" });

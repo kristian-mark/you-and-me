@@ -19,6 +19,9 @@ import { GROK_PROVIDERS } from "./providers";
  * the visitor stays signed in.
  */
 export const authClient = createAuthClient({
+  // Session reads stay on mount and window focus. There is no interval:
+  // a game poll must not call /api/auth/get-session every few seconds.
+  sessionOptions: { refetchInterval: 0 },
   plugins: [genericOAuthClient()],
   fetchOptions: {
     onRequest(ctx) {

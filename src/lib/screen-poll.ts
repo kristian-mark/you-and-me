@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
+import { isConnectionFailure } from "./user-message.ts";
 
 /** Tasks, wishes, calendar, and any other synced list. */
 export const LIST_POLL_MS = 20_000;
-/** Tic-tac-toe, only while that screen is mounted. */
-export const GAME_POLL_MS = 3_000;
+/** A board game, only while that screen is mounted and the tab is visible. */
+export const GAME_POLL_MS = 5_000;
 /** Invite screen: partner has not joined yet. */
 export const PAIR_WAIT_POLL_MS = 5_000;
 /** Paired profile: names, birthdays, together date, join/leave. */
@@ -12,10 +13,11 @@ export const PAIR_POLL_MS = 4 * 60 * 60 * 1000;
 const BACKOFF_CAP = 4;
 
 /** A background refresh stays quiet until this many misses in a row. */
-export const POLL_NOTICE_AFTER_FAILURES = 2;
+export const POLL_NOTICE_AFTER_FAILURES = 4;
 
 /** Null while a blip should retry unseen. The message after repeated misses. */
 export function pollFailureNotice(failures: number, message: string): string | null {
+  if (isConnectionFailure(message)) return null;
   if (failures < POLL_NOTICE_AFTER_FAILURES) return null;
   return message;
 }

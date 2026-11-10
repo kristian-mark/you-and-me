@@ -34,8 +34,8 @@ import { bearer, genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { getCookie } from "@tanstack/react-start/server";
 import { randomBytes } from "node:crypto";
-import { Pool } from "pg";
 import { ensureDbReady, getPglite } from "../db";
+import { getSharedPgPool } from "../pg-pool";
 import { emailAndPasswordEnabled } from "./email-password";
 import { GATE_PROVIDER_ID, gateIdentitySessions } from "./gate-session.server";
 import { GROK_PROVIDERS } from "./providers";
@@ -161,16 +161,7 @@ const grokUserInfoUrl = `${issuerBase}/api/auth/oauth2/userinfo`;
 // schema from `migrations/auth/0001_auth.sql`, copied into `migrations/` when
 // the app turns sign-in on.
 const database = databaseUrl
-  ? new Pool({
-      connectionString: databaseUrl,
-      // Same cap as the app pool in db.ts. Two default pools (max 10 each)
-      // on warm instances exceed Supabase session mode (15 clients) and the
-      // user-row check fails for everyone in the match at once.
-      max: 1,
-      idleTimeoutMillis: 1_000,
-      connectionTimeoutMillis: 4_000,
-      allowExitOnIdle: true,
-    })
+  ? getSharedPgPool(databaseUrl)
   : { dialect: pgliteDialect(() => getPglite()), type: "postgres" as const };
 
 /** Session token cookie name — also read by the live-preview popup completion page. */
@@ -235,6 +226,25 @@ export const auth = betterAuth({
   // Do not cache the session in a cookie. A deleted "user" row would otherwise
   // stay signed in until maxAge, and the app would create a profile for that id.
   session: { cookieCache: { enabled: false } },
+
+  // Production turns this on. The counter lives in memory on each instance,
+  // keyed by IP and path, so two phones on one home connection share a bucket
+  // only when they hit the same instance. Reading the session is not limited.
+  // Sign-in stays strict: the built-in rule is 3 tries per 10 seconds, which
+  // locks a couple out after a couple of taps.
+  rateLimit: {
+    window: 60,
+    max: 200,
+    storage: "memory",
+    customRules: {
+      "/get-session": false,
+      "/sign-in/*": { window: 60, max: 12 },
+      "/sign-up/*": { window: 60, max: 8 },
+      "/change-password": { window: 60, max: 5 },
+      "/forget-password": { window: 60, max: 5 },
+      "/request-password-reset": { window: 60, max: 5 },
+    },
+  },
 
   // Local email/password — toggled only via `./email-password` (not a plugin).
   ...(emailAndPasswordEnabled ? { emailAndPassword: { enabled: true } } : {}),

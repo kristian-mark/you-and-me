@@ -5,24 +5,26 @@ import { pieceBorder, pieceText, type PieceColor } from "@/lib/pair-color";
 import { GAME_POLL_MS, pollFailureNotice, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 import { loadTttMatch, openNewTttMatch, playTttMove } from "@/lib/turn/server";
 import { tttBanner, type TttMatchView } from "@/lib/turn/ttt";
+import { isConnectionFailure, userMessage } from "@/lib/user-message";
 
 function textOf(error: unknown) {
-  if (error instanceof Error && error.message.trim()) return error.message;
-  if (
-    error &&
-    typeof error === "object" &&
-    "message" in error &&
-    typeof error.message === "string" &&
-    error.message.trim()
-  ) {
-    return error.message;
-  }
-  return "Не вышло связаться с партией";
+  return userMessage(error, "Не вышло связаться с партией");
+}
+
+function showFailure(error: unknown, setNotice: (value: string) => void) {
+  const text = textOf(error);
+  if (isConnectionFailure(text)) return;
+  setNotice(text);
 }
 
 function Cross({ tone }: { tone: PieceColor }) {
   return (
-    <svg viewBox="0 0 48 48" className={`size-[46%] ${pieceText(tone)}`} aria-hidden="true">
+    <svg
+      viewBox="0 0 48 48"
+      className={`pointer-events-none absolute ${pieceText(tone)}`}
+      style={{ top: "27%", left: "27%", width: "46%", height: "46%" }}
+      aria-hidden="true"
+    >
       <path
         d="M14 14 L34 34 M34 14 L14 34"
         fill="none"
@@ -35,7 +37,12 @@ function Cross({ tone }: { tone: PieceColor }) {
 }
 
 function Nought({ tone }: { tone: PieceColor }) {
-  return <span className={`size-[42%] rounded-full border-[3px] ${pieceBorder(tone)}`} />;
+  return (
+    <span
+      className={`pointer-events-none absolute rounded-full border-[3px] ${pieceBorder(tone)}`}
+      style={{ top: "29%", left: "29%", width: "42%", height: "42%" }}
+    />
+  );
 }
 
 function Mark({ cross, tone }: { cross: boolean; tone: PieceColor }) {
@@ -109,7 +116,7 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
       })
       .catch((error: unknown) => {
         noticeFromPoll.current = false;
-        setNotice(textOf(error));
+        showFailure(error, setNotice);
         return loadTttMatch()
           .then((next) => setView(next))
           .catch(() => undefined);
@@ -130,7 +137,7 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
       .then((next) => setView(next))
       .catch((error: unknown) => {
         noticeFromPoll.current = false;
-        setNotice(textOf(error));
+        showFailure(error, setNotice);
         return loadTttMatch()
           .then((next) => setView(next))
           .catch(() => undefined);
@@ -153,7 +160,7 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
       })
       .catch((error: unknown) => {
         noticeFromPoll.current = false;
-        setNotice(textOf(error));
+        showFailure(error, setNotice);
         return loadTttMatch()
           .then((next) => setView(next))
           .catch(() => undefined);
@@ -210,8 +217,8 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
               <p className="mt-0.5 text-[15px] text-[#e6e1d6]">{banner.hint}</p>
             </div>
 
-            <div className={`mt-2 flex min-h-0 flex-1 items-center justify-center [container-type:size] ${pending ? "opacity-70" : ""}`}>
-              <div className="grid aspect-square grid-cols-3 gap-2 sm:gap-3" style={{ width: "min(100cqw, 100cqh, 34rem)" }}>
+            <div className={`mx-auto mt-2 w-full max-w-[34rem] ${pending ? "opacity-70" : ""}`}>
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
                 {view.board.map((cell, index) => {
                   const win = view.winningLine?.includes(index);
                   const tone = cell === "partner" ? colors.partner : colors.me;
@@ -220,16 +227,17 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
                   const label =
                     cell === null ? `Клетка ${index + 1}, пусто` : cell === "me" ? `Клетка ${index + 1}, твоя` : `Клетка ${index + 1}, партнёра`;
                   return (
-                    <button
-                      key={index}
-                      type="button"
-                      aria-label={label}
-                      disabled={pending || view.status === "finished" || !view.myTurn || cell !== null}
-                      onClick={() => onCell(index)}
-                      className={`grid aspect-square place-items-center rounded-[18px] bg-raised disabled:opacity-100 sm:rounded-[22px] ${win ? "border border-cream" : "border border-transparent"}`}
-                    >
-                      {cell ? <Mark cross={cross} tone={tone} /> : null}
-                    </button>
+                    <div key={index} className="sq">
+                      <button
+                        type="button"
+                        aria-label={label}
+                        disabled={pending || view.status === "finished" || !view.myTurn || cell !== null}
+                        onClick={() => onCell(index)}
+                        className={`sq-fill rounded-[18px] bg-raised disabled:opacity-100 sm:rounded-[22px] ${win ? "border border-cream" : "border border-transparent"}`}
+                      >
+                        {cell ? <Mark cross={cross} tone={tone} /> : null}
+                      </button>
+                    </div>
                   );
                 })}
               </div>

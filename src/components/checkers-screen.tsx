@@ -5,13 +5,16 @@ import { pieceBg, type PieceColor } from "@/lib/pair-color";
 import { GAME_POLL_MS, pollFailureNotice, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 import { CHECK_SIZE, checkersBanner, type CheckersMatchView } from "@/lib/turn/checkers";
 import { loadCheckersMatch, openNewCheckersMatch, playCheckersMove } from "@/lib/turn/server";
+import { isConnectionFailure, userMessage } from "@/lib/user-message";
 
 function textOf(error: unknown) {
-  if (error instanceof Error && error.message.trim()) return error.message;
-  if (error && typeof error === "object" && "message" in error && typeof error.message === "string" && error.message.trim()) {
-    return error.message;
-  }
-  return "Не вышло связаться с партией";
+  return userMessage(error, "Не вышло связаться с партией");
+}
+
+function showFailure(error: unknown, setNotice: (value: string) => void) {
+  const text = textOf(error);
+  if (isConnectionFailure(text)) return;
+  setNotice(text);
 }
 
 function absoluteOf(display: number, flip: boolean) {
@@ -47,21 +50,34 @@ function CheckersBoard({
           const marked = last.has(index);
           const square = !dark ? "bg-[#121318]" : marked ? "bg-[#3a3428]" : "bg-[#22242c]";
           return (
-            <button
-              key={display}
-              type="button"
-              aria-label={lands.has(index) ? `Клетка ${display + 1}, можно ходить` : `Клетка ${display + 1}`}
-              disabled={!onSquare || pending || !dark}
-              onClick={() => onSquare?.(index)}
-              className={`grid aspect-square place-items-center disabled:opacity-100 ${square}`}
-            >
+            <div key={display} className="sq">
+              <button
+                type="button"
+                aria-label={lands.has(index) ? `Клетка ${display + 1}, можно ходить` : `Клетка ${display + 1}`}
+                disabled={!onSquare || pending || !dark}
+                onClick={() => onSquare?.(index)}
+                className={`sq-fill disabled:opacity-100 ${square}`}
+              />
               {color ? (
-                <span className={`grid size-[74%] place-items-center rounded-full ${pieceBg(color)} ${chosen ? "ring-2 ring-cream" : ""}`}>
-                  {view.kings[index] ? <Crown className="size-[46%] text-cream" strokeWidth={2.4} /> : null}
+                <span
+                  className={`pointer-events-none absolute grid place-items-center rounded-full ${pieceBg(color)}`}
+                  style={{
+                    top: "13%",
+                    left: "13%",
+                    width: "74%",
+                    height: "74%",
+                    boxShadow: chosen ? "0 0 0 2px #ece8df" : undefined,
+                  }}
+                >
+                  {view.kings[index] ? (
+                    <Crown className="text-cream" strokeWidth={2.4} style={{ width: "46%", height: "46%" }} />
+                  ) : null}
                 </span>
               ) : null}
-              {lands.has(index) ? <span className="size-2.5 rounded-full bg-cream" /> : null}
-            </button>
+              {lands.has(index) ? (
+                <span className="pointer-events-none absolute rounded-full bg-cream" style={{ top: "42%", left: "42%", width: "16%", height: "16%" }} />
+              ) : null}
+            </div>
           );
         })}
       </div>
@@ -158,7 +174,7 @@ export function CheckersMatch({ onBack }: { onBack: () => void; onAgain?: () => 
         .then((next) => take(next))
         .catch((error: unknown) => {
           noticeFromPoll.current = false;
-          setNotice(textOf(error));
+          showFailure(error, setNotice);
           return reconcile();
         })
         .finally(() => {
@@ -241,7 +257,7 @@ export function CheckersMatch({ onBack }: { onBack: () => void; onAgain?: () => 
                     .then((next) => setView(next))
                     .catch((error: unknown) => {
                       noticeFromPoll.current = false;
-                      setNotice(textOf(error));
+                      showFailure(error, setNotice);
                       return reconcile();
                     })
                     .finally(() => {
