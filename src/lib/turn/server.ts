@@ -32,6 +32,16 @@ import {
   type DotsState,
 } from "./dots.ts";
 import {
+  beginReversi,
+  idleRevView,
+  newReversiMatch,
+  presentReversi,
+  readRevState,
+  type RevMatchView,
+  type RevMove,
+  type RevState,
+} from "./reversi.ts";
+import {
   beginTtt,
   idleTttView,
   newTttMatch,
@@ -248,6 +258,17 @@ const c4Match = createMatch<C4State, C4MatchView>({
   apply: (snapshot, seat, move) => turnGames.c4.apply(snapshot, seat, move as C4Move),
 });
 
+const reversiMatch = createMatch<RevState, RevMatchView>({
+  game: turnGames.reversi.type,
+  empty: () => turnGames.reversi.empty(),
+  read: readRevState,
+  begin: beginReversi,
+  reset: newReversiMatch,
+  present: presentReversi,
+  idle: idleRevView,
+  apply: (snapshot, seat, move) => turnGames.reversi.apply(snapshot, seat, move as RevMove),
+});
+
 const dotsMatch = createMatch<DotsState, DotsMatchView>({
   game: turnGames.dots.type,
   empty: () => turnGames.dots.empty(),
@@ -387,6 +408,48 @@ export const openNewDotsMatch = createServerFn({ method: "POST" })
   .handler(async ({ context, data }): Promise<DotsMatchView> => {
     try {
       return await dotsMatch.open(context.userId, data.version);
+    } catch (error) {
+      textOf(error);
+    }
+  });
+
+export const loadReversiMatch = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }): Promise<RevMatchView> => {
+    try {
+      return await reversiMatch.load(context.userId);
+    } catch (error) {
+      textOf(error);
+    }
+  });
+
+export const playReversiMove = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: unknown) => {
+    if (!input || typeof input !== "object") throw new Error("Некорректный ход");
+    const raw = input as { index?: unknown; version?: unknown };
+    if (typeof raw.index !== "number" || !Number.isInteger(raw.index) || raw.index < 0 || raw.index > 63) {
+      throw new Error("Нет такой клетки");
+    }
+    return { index: raw.index, version: parseVersion(raw.version) };
+  })
+  .handler(async ({ context, data }): Promise<RevMatchView> => {
+    try {
+      return await reversiMatch.play(context.userId, { index: data.index }, data.version);
+    } catch (error) {
+      textOf(error);
+    }
+  });
+
+export const openNewReversiMatch = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: unknown) => {
+    if (!input || typeof input !== "object") throw new Error("Некорректная партия");
+    return { version: parseVersion((input as { version?: unknown }).version) };
+  })
+  .handler(async ({ context, data }): Promise<RevMatchView> => {
+    try {
+      return await reversiMatch.open(context.userId, data.version);
     } catch (error) {
       textOf(error);
     }
