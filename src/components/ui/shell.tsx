@@ -28,7 +28,7 @@ export function UsBadge() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex min-h-11 items-center gap-2 rounded-full bg-raised px-3"
+        className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-raised px-2.5"
       >
         <span className="text-sm text-fg">Мы</span>
         <span className="relative h-5 w-8">
@@ -49,14 +49,14 @@ export function ScreenHeader({
   onAdd?: () => void;
 }) {
   return (
-    <header className="flex items-center justify-between px-5 pt-6 pb-4">
-      <h1 className="text-[32px] font-semibold tracking-tight">{title}</h1>
-      <div className="flex items-center gap-2">
+    <header className="flex min-w-0 items-center gap-2 px-5 pt-6 pb-4">
+      <h1 className="min-w-0 flex-1 truncate text-[28px] font-semibold tracking-tight sm:text-[32px]">{title}</h1>
+      <div className="flex shrink-0 items-center gap-1.5">
         {onAdd ? (
           <button
             type="button"
             onClick={onAdd}
-            className="grid size-11 place-items-center rounded-full bg-raised"
+            className="grid size-10 place-items-center rounded-full bg-raised"
             aria-label="Добавить"
           >
             <Plus className="size-5" />
@@ -108,7 +108,7 @@ export function TabBar() {
   if (moreOpen || openTaskId) return null;
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-      <div className="app-frame grid grid-cols-5 px-2 pt-1 pb-1">
+      <div className="app-frame grid min-w-0 grid-cols-5 px-1 pt-1 pb-1">
         {TABS.map((t) => {
           const Icon = t.icon;
           const active = tab === t.id;
@@ -117,7 +117,7 @@ export function TabBar() {
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className={`flex min-h-11 flex-col items-center justify-center gap-0.5 text-[11px] ${active ? "text-fg" : "text-muted"}`}
+              className={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 text-[10px] leading-none sm:text-[11px] ${active ? "text-fg" : "text-muted"}`}
             >
               <Icon className="size-5" strokeWidth={active ? 2.2 : 1.7} />
               {t.label}

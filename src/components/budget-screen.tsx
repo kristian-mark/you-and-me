@@ -497,9 +497,9 @@ export function BudgetScreen({ onBack }: { onBack: () => void }) {
       <button type="button" onClick={onBack} className="pt-5 text-left text-[17px] text-muted">
         ‹ Ещё
       </button>
-      <div className="mt-5 flex items-center justify-between">
-        <h1 className="text-[34px] font-semibold tracking-tight">Бюджет</h1>
-        <div className="flex items-center gap-2">
+      <div className="mt-5 flex min-w-0 items-center gap-2">
+        <h1 className="min-w-0 flex-1 truncate text-[30px] font-semibold tracking-tight sm:text-[34px]">Бюджет</h1>
+        <div className="flex shrink-0 items-center gap-1.5">
           <button
             type="button"
             onClick={() => {

@@ -5,6 +5,7 @@ import { pieceBorder, pieceText, type PieceColor } from "@/lib/pair-color";
 import { GAME_POLL_MS, pollFailureNotice, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 import { loadTttMatch, openNewTttMatch, playTttMove } from "@/lib/turn/server";
 import { tttBanner, type TttMatchView } from "@/lib/turn/ttt";
+import { ScoreLine } from "@/components/score-line";
 import { isConnectionFailure, userMessage } from "@/lib/user-message";
 
 function textOf(error: unknown) {
@@ -243,16 +244,15 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
               </div>
             </div>
 
-            <div className="mt-2 flex shrink-0 items-center gap-3 rounded-[22px] bg-raised px-4 py-2.5">
-              <span className={`size-3 shrink-0 rounded-full ${colors.me === "blue" ? "bg-blue" : "bg-pink"}`} />
-              <span className="min-w-0 flex-1 truncate text-[15px]">{myName}</span>
-              <span className="text-[20px] font-semibold tracking-wide">
-                {view.wins.me}
-                <span className="px-2 text-[#e6e1d6]">:</span>
-                {view.wins.partner}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-right text-[15px]">{partnerName}</span>
-              <span className={`size-3 shrink-0 rounded-full ${colors.partner === "blue" ? "bg-blue" : "bg-pink"}`} />
+            <div className="mt-2 min-w-0 shrink-0 rounded-[22px] bg-raised px-3 py-2.5 sm:px-4">
+              <ScoreLine
+                myName={myName}
+                partnerName={partnerName}
+                mine={view.wins.me}
+                theirs={view.wins.partner}
+                myTone={colors.me === "blue" ? "bg-blue" : "bg-pink"}
+                partnerTone={colors.partner === "blue" ? "bg-blue" : "bg-pink"}
+              />
             </div>
             {view.draws > 0 ? <p className="mt-1 shrink-0 text-center text-[13px] text-[#e6e1d6]">Ничьих: {view.draws}</p> : null}
             {notice ? <p className="mt-1 shrink-0 text-center text-[14px] text-pink">{notice}</p> : null}

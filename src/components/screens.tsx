@@ -717,29 +717,31 @@ export function CalendarScreen() {
   };
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col px-5 pb-28">
-      <p className="pt-5 text-[13px] tracking-wide text-muted uppercase">
+    <section className="flex min-h-0 w-full min-w-0 flex-1 flex-col px-5 pb-28">
+      <p className="min-w-0 pt-5 text-[13px] text-muted uppercase">
         {format(new Date(), "EEEE, d MMMM yyyy", { locale: ru })}
       </p>
-      <div className="mt-2 flex items-center justify-between">
-        <h1 className="text-[32px] font-semibold capitalize">
+      <div className="mt-2 flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <h1 className="min-w-0 text-[32px] leading-none font-semibold capitalize">
           {format(cursor, "LLLL", { locale: ru })}
         </h1>
-        <div className="flex items-center gap-2">
-          <button type="button" className="grid size-10 place-items-center rounded-xl bg-raised">
+        <div className="flex max-w-full shrink-0 items-center">
+          <button type="button" className="grid size-9 place-items-center rounded-xl bg-raised" aria-label="Календарь">
             <CalendarDays className="size-5" />
           </button>
           <button
             type="button"
             onClick={() => setCursor((d) => addMonths(d, -1))}
-            className="grid size-10 place-items-center"
+            className="grid size-9 place-items-center"
+            aria-label="Предыдущий месяц"
           >
             <ChevronLeft className="size-5" />
           </button>
           <button
             type="button"
             onClick={() => setCursor((d) => addMonths(d, 1))}
-            className="grid size-10 place-items-center"
+            className="grid size-9 place-items-center"
+            aria-label="Следующий месяц"
           >
             <ChevronRight className="size-5" />
           </button>
@@ -1614,8 +1616,8 @@ export function MoreScreen() {
 
   return (
     <section className="px-5 pt-6 pb-28">
-      <div className="flex items-center justify-between">
-        <h1 className="text-[32px] font-semibold">Ещё</h1>
+      <div className="flex min-w-0 items-center gap-2">
+        <h1 className="min-w-0 flex-1 truncate text-[32px] font-semibold">Ещё</h1>
         <UsBadge />
       </div>
       <div className="mt-5 overflow-hidden rounded-[28px] bg-raised">

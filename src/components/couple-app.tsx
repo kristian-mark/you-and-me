@@ -298,7 +298,7 @@ function AppShell() {
   }, [wishes, myUserId, partnerUserId, localOwnerId]);
 
   return (
-    <main className="app-frame safe-pad flex min-h-dvh flex-col bg-bg">
+    <main className="app-frame safe-pad flex min-h-dvh min-w-0 flex-col bg-bg">
       {tab === "tasks" ? <TasksScreen /> : null}
       {tab === "calendar" ? <CalendarScreen /> : null}
       {tab === "wishes" ? <WishesScreen /> : null}
