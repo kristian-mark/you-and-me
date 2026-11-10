@@ -274,13 +274,15 @@ export const auth = betterAuth({
     // to the broker with the SAME client and differing only by the `idp` hint.
     ...(grokOAuthPlugin ? [grokOAuthPlugin] : []),
 
-    // Accept `Authorization: Bearer <session-token>` as an alternative to the
-    // cookie. Needed for the LIVE PREVIEW: the app runs in an embedded iframe
-    // where cookies are partitioned, so after popup sign-in it authenticates with
-    // a bearer token instead (see `client.ts` / the `auth` skill). The hook only
-    // fires when an Authorization header is present, so the cookie path
-    // (deployed apps) is unaffected.
-    bearer(),
+    // Accept `Authorization: Bearer <signed session cookie>` as an alternative
+    // to the cookie. Needed for the LIVE PREVIEW: the app runs in an embedded
+    // iframe where cookies are partitioned, so after popup sign-in it
+    // authenticates with the signed session cookie posted back by the popup
+    // (see `client.ts`). The hook only fires when an Authorization header is
+    // present, so deployed login still uses the session cookie alone.
+    // requireSignature rejects a raw session.token copied out of the database;
+    // the popup token is the signed cookie value and still verifies.
+    bearer({ requireSignature: true }),
 
     // Bridges Better Auth's Set-Cookie into TanStack Start responses. MUST be
     // last so it runs after every other plugin's hooks.

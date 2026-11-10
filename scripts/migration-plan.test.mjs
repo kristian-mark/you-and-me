@@ -56,10 +56,22 @@ test("non-.sql entries are dropped (readdir also yields the auth/ directory)", (
   assert.deepEqual(pendingMigrations(["auth", "README.md"], []), []);
 });
 
-test("the auth schema ships outside the globbed directory", () => {
+test("globbed migrations apply once, including the auth lock", () => {
   const migrationsDir = join(projectRoot(), "migrations");
-  assert.deepEqual(pendingMigrations(readdirSync(migrationsDir), []), []);
+  const pending = pendingMigrations(readdirSync(migrationsDir), []);
+  const names = pending.map((item) => item.name);
+  assert.ok(names.includes("0001_auth.sql"));
+  assert.ok(names.includes("0005_secure_auth_tables_rls.sql"));
+  assert.deepEqual(pendingMigrations(readdirSync(migrationsDir), names), []);
   assert.ok(readdirSync(join(migrationsDir, "auth")).includes("0001_auth.sql"));
+  const lock = readFileSync(join(migrationsDir, "0005_secure_auth_tables_rls.sql"), "utf8").toLowerCase();
+  assert.equal(lock.includes("drop table"), false);
+  const superseded = readFileSync(
+    join(projectRoot(), "supabase/migrations/20261108180000_lock_anon.sql"),
+    "utf8",
+  ).toLowerCase();
+  assert.equal(superseded.includes("revoke"), false);
+  assert.equal(superseded.includes("alter table"), false);
 });
 
 test("this workspace's auth schema copy is byte-identical to its source", () => {
