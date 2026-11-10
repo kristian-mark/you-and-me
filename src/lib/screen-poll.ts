@@ -12,7 +12,7 @@ export const PAIR_POLL_MS = 4 * 60 * 60 * 1000;
 const BACKOFF_CAP = 4;
 
 /** A background refresh stays quiet until this many misses in a row. */
-export const POLL_NOTICE_AFTER_FAILURES = 2;
+export const POLL_NOTICE_AFTER_FAILURES = 4;
 
 /** Null while a blip should retry unseen. The message after repeated misses. */
 export function pollFailureNotice(failures: number, message: string): string | null {

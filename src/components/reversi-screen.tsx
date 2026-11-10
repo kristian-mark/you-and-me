@@ -5,13 +5,10 @@ import { pieceBg, pieceBorder, type PieceColor } from "@/lib/pair-color";
 import { GAME_POLL_MS, pollFailureNotice, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 import { REV, reversiBanner, type RevMark, type RevMatchView } from "@/lib/turn/reversi";
 import { loadReversiMatch, openNewReversiMatch, playReversiMove } from "@/lib/turn/server";
+import { userMessage } from "@/lib/user-message";
 
 function textOf(error: unknown) {
-  if (error instanceof Error && error.message.trim()) return error.message;
-  if (error && typeof error === "object" && "message" in error && typeof error.message === "string" && error.message.trim()) {
-    return error.message;
-  }
-  return "Не вышло связаться с партией";
+  return userMessage(error, "Не вышло связаться с партией");
 }
 
 function tone(owner: RevMark, colors: { me: PieceColor; partner: PieceColor }) {
@@ -43,24 +40,34 @@ function ReversiBoard({
           const marked = view.last === index;
           const spinning = flipped.has(index);
           return (
-            <button
-              key={index}
-              type="button"
-              aria-label={can ? `Клетка ${index + 1}, можно ходить` : `Клетка ${index + 1}`}
-              disabled={!can || pending}
-              onClick={() => onCell?.(index)}
-              className="grid aspect-square place-items-center bg-[#16181e] disabled:opacity-100"
-            >
+            <div key={index} className="sq">
+              <button
+                type="button"
+                aria-label={can ? `Клетка ${index + 1}, можно ходить` : `Клетка ${index + 1}`}
+                disabled={!can || pending}
+                onClick={() => onCell?.(index)}
+                className="sq-fill bg-[#16181e] disabled:opacity-100"
+              />
               {color ? (
                 <span
                   key={spinning ? `${index}-${view.version}` : index}
-                  className={`size-[72%] rounded-full ${pieceBg(color)} ${spinning ? "disc-flip" : ""} ${
-                    marked ? "ring-2 ring-cream" : ""
-                  }`}
+                  className={`pointer-events-none absolute rounded-full ${pieceBg(color)} ${spinning ? "disc-flip" : ""}`}
+                  style={{
+                    top: "14%",
+                    left: "14%",
+                    width: "72%",
+                    height: "72%",
+                    boxShadow: marked ? "0 0 0 2px #ece8df" : undefined,
+                  }}
                 />
               ) : null}
-              {can ? <span className={`size-[34%] rounded-full border-2 ${pieceBorder(colors.me)}`} /> : null}
-            </button>
+              {can ? (
+                <span
+                  className={`pointer-events-none absolute rounded-full border-2 ${pieceBorder(colors.me)}`}
+                  style={{ top: "33%", left: "33%", width: "34%", height: "34%" }}
+                />
+              ) : null}
+            </div>
           );
         })}
       </div>

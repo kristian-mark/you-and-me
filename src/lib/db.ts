@@ -95,11 +95,12 @@ function createNeonSql(): Promise<Sql> {
     types.setTypeParser(OID_INTERVAL, identity);
     const pool = new Pool({
       connectionString: databaseUrl,
-      // Supabase session mode allows about 15 clients. pg's default of 10,
-      // left idle on each warm instance, plus Better Auth's own pool, filled
-      // that limit during a two-player game poll. The account check then
-      // failed and the match flashed «Не удалось проверить аккаунт».
+      // Supabase session mode allows about 15 clients. A warm Vercel
+      // instance keeps an idle pool client open (timers pause while the
+      // isolate is frozen), so each query takes a fresh connection and
+      // closes it instead of holding a slot.
       max: 1,
+      maxUses: 1,
       idleTimeoutMillis: 1_000,
       connectionTimeoutMillis: 4_000,
       allowExitOnIdle: true,

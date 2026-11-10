@@ -5,13 +5,10 @@ import { pieceBg, type PieceColor } from "@/lib/pair-color";
 import { GAME_POLL_MS, pollFailureNotice, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 import { DOTS_BOXES, DOTS_SPAN, dotsBanner, type DotsLine, type DotsMark, type DotsMatchView } from "@/lib/turn/dots";
 import { loadDotsMatch, openNewDotsMatch, playDotsMove } from "@/lib/turn/server";
+import { userMessage } from "@/lib/user-message";
 
 function textOf(error: unknown) {
-  if (error instanceof Error && error.message.trim()) return error.message;
-  if (error && typeof error === "object" && "message" in error && typeof error.message === "string" && error.message.trim()) {
-    return error.message;
-  }
-  return "Не вышло связаться с партией";
+  return userMessage(error, "Не вышло связаться с партией");
 }
 
 function lineTone(owner: DotsMark, colors: { me: PieceColor; partner: PieceColor }) {
@@ -34,8 +31,8 @@ function DotsBoard({
   const interactive = Boolean(onLine);
   return (
     <div className={`rounded-[28px] bg-[#16181e] p-4 sm:p-6 ${pending ? "opacity-70" : ""}`}>
-      <div className="relative mx-auto aspect-square w-full max-w-[24rem] p-6">
-        <div className="relative size-full">
+      <div className="mx-auto w-full max-w-[24rem] px-6">
+        <div className="sq">
           {Array.from({ length: DOTS_SPAN }, (_, row) =>
             Array.from({ length: DOTS_BOXES }, (_, column) => {
               const index = row * DOTS_BOXES + column;

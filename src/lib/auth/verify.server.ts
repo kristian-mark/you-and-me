@@ -98,6 +98,10 @@ export async function requireUserId(bearerToken?: string): Promise<string> {
   return user.id;
 }
 
+/** A confirmed account is trusted for a minute so a 3s game poll does not query "user" every tick. */
+const KNOWN_USER_MS = 60_000;
+const knownUsers = new Map<string, number>();
+
 /**
  * The session cookie can outlive the account (Better Auth's cookie cache, or a
  * session row left behind). Never treat that id as a real user.
@@ -105,6 +109,8 @@ export async function requireUserId(bearerToken?: string): Promise<string> {
  */
 export async function assertKnownUser(userId: string) {
   if (!authConfigured && userId === DEV_USER_ID) return;
+  const knownUntil = knownUsers.get(userId);
+  if (knownUntil && knownUntil > Date.now()) return;
   let exists = false;
   try {
     const sql = await getSql();
@@ -114,7 +120,11 @@ export async function assertKnownUser(userId: string) {
     console.error("[auth] could not check the user row", error);
     throw new Error("Не удалось проверить аккаунт");
   }
-  if (exists) return;
+  if (exists) {
+    knownUsers.set(userId, Date.now() + KNOWN_USER_MS);
+    return;
+  }
+  knownUsers.delete(userId);
   const request = getRequest();
   if (request) {
     try {

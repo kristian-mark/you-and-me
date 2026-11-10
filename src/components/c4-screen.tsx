@@ -5,13 +5,10 @@ import { pieceBg, type PieceColor } from "@/lib/pair-color";
 import { GAME_POLL_MS, pollFailureNotice, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 import { C4_COLS, C4_ROWS, c4Banner, c4Index, type C4MatchView } from "@/lib/turn/c4";
 import { loadC4Match, openNewC4Match, playC4Move } from "@/lib/turn/server";
+import { userMessage } from "@/lib/user-message";
 
 function textOf(error: unknown) {
-  if (error instanceof Error && error.message.trim()) return error.message;
-  if (error && typeof error === "object" && "message" in error && typeof error.message === "string" && error.message.trim()) {
-    return error.message;
-  }
-  return "Не вышло связаться с партией";
+  return userMessage(error, "Не вышло связаться с партией");
 }
 
 export function ConnectFourMatch({ onBack }: { onBack: () => void; onAgain?: () => void }) {
@@ -161,12 +158,11 @@ export function ConnectFourMatch({ onBack }: { onBack: () => void; onAgain?: () 
                         const tone: PieceColor | null = cell === null ? null : cell === "me" ? colors.me : colors.partner;
                         const marked = winning.has(index);
                         return (
-                          <span
-                            key={row}
-                            className={`aspect-square rounded-full ${
-                              tone ? pieceBg(tone) : "bg-bg"
-                            } ${marked ? "ring-2 ring-cream" : ""}`}
-                          />
+                          <span key={row} className="sq">
+                            <span
+                              className={`sq-fill rounded-full ${tone ? pieceBg(tone) : "bg-bg"} ${marked ? "ring-2 ring-cream" : ""}`}
+                            />
+                          </span>
                         );
                       })}
                     </button>

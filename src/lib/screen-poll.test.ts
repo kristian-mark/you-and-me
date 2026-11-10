@@ -208,9 +208,10 @@ test("changing the interval does not fetch by itself", async () => {
   assert.equal(calls, 2);
 });
 
-test("one poll miss stays quiet and a second miss is shown", () => {
+test("a few poll misses stay quiet and a repeated miss is shown", () => {
   assert.equal(pollFailureNotice(1, "Не удалось проверить аккаунт"), null);
-  assert.equal(pollFailureNotice(2, "Не удалось проверить аккаунт"), "Не удалось проверить аккаунт");
+  assert.equal(pollFailureNotice(3, "Не удалось проверить аккаунт"), null);
+  assert.equal(pollFailureNotice(4, "Не удалось проверить аккаунт"), "Не удалось проверить аккаунт");
 });
 
 test("refreshOpenScreens is a no-op while hidden and refreshes when visible", async () => {

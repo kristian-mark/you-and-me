@@ -163,6 +163,23 @@
   padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
 }
 
+/* Square from the element's width. Older iOS Safari ignores aspect-ratio on
+   buttons, so a disc sized with a percentage height collapses into a dash. */
+.sq {
+  position: relative;
+  width: 100%;
+  height: 0;
+  padding-bottom: 100%;
+}
+
+.sq-fill {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
 @keyframes disc-flip {
   0% { transform: scaleX(1); }
   40% { transform: scaleX(0.08); }
