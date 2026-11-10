@@ -8,7 +8,6 @@ import {
   type DCard,
   type DurakState,
   type Piece,
-  type RevCell,
   type Ship,
   type ShotMap,
   type Side,
@@ -19,14 +18,9 @@ import {
   durakApply,
   durakLegal,
   emptyCheckers,
-  emptyReversi,
   fireAt,
   newDurak,
   randomFleet,
-  reversiMoves,
-  reversiOutcome,
-  reversiPlay,
-  reversiScore,
   sameSq,
 } from "@/lib/games";
 
@@ -102,54 +96,6 @@ function Outcome({
         Ещё партию
       </button>
     </div>
-  );
-}
-
-export function Reversi({ onBack, onAgain }: { onBack: () => void; onAgain: () => void }) {
-  const pieceClass = usePieceClass();
-  const [board, setBoard] = useState<RevCell[][]>(emptyReversi);
-  const [turn, setTurn] = useState<Side>("me");
-  const moves = reversiMoves(board, turn);
-  const passed = moves.length === 0 && reversiMoves(board, turn === "me" ? "partner" : "me").length > 0;
-  const result = reversiOutcome(board);
-  const score = reversiScore(board);
-  useAward(result);
-  const side = passed ? (turn === "me" ? "partner" : "me") : turn;
-  const legal = new Set(reversiMoves(board, side).map((m) => `${m.r},${m.c}`));
-  return (
-    <Shell title="Реверси" onBack={onBack}>
-      {result ? null : <Turn side={side} />}
-      <p className="mt-1 text-[14px] text-muted">
-        {score.me} : {score.partner}
-        {passed ? " · ход переходит" : ""}
-      </p>
-      <div className="mt-5 grid grid-cols-8 gap-1 rounded-[24px] bg-raised p-2">
-        {board.map((row, r) =>
-          row.map((cell, c) => {
-            const can = !result && legal.has(`${r},${c}`);
-            return (
-              <button
-                key={`${r}-${c}`}
-                type="button"
-                disabled={!can}
-                onClick={() => {
-                  const next = reversiPlay(board, r, c, side);
-                  if (!next) return;
-                  const opp = side === "me" ? "partner" : "me";
-                  setBoard(next);
-                  setTurn(reversiMoves(next, opp).length ? opp : side);
-                }}
-                className="grid aspect-square place-items-center rounded-md bg-bg"
-              >
-                {cell ? <span className={`size-[70%] rounded-full ${pieceClass(cell)}`} /> : null}
-                {can ? <span className={`size-2 rounded-full ${pieceClass(side)}`} /> : null}
-              </button>
-            );
-          }),
-        )}
-      </div>
-      {result ? <Outcome result={result} onAgain={onAgain} /> : null}
-    </Shell>
   );
 }
 

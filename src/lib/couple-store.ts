@@ -275,6 +275,7 @@ type CoupleState = {
   tttNoted: string;
   c4Noted: string;
   dotsNoted: string;
+  reversiNoted: string;
   budget: BudgetState;
   openTaskId: string | null;
   taskReturn: TabId | null;
@@ -357,6 +358,7 @@ type CoupleState = {
   noteTtt: (winner: "me" | "partner" | "draw", key: string) => void;
   noteC4: (winner: "me" | "partner" | "draw", key: string) => void;
   noteDots: (winner: "me" | "partner" | "draw", key: string) => void;
+  noteReversi: (winner: "me" | "partner" | "draw", key: string) => void;
   setBudgetCurrency: (code: string) => void;
   addBudgetTx: (input: Omit<BudgetTx, "id" | "createdAt">) => void;
   deleteBudgetTx: (id: string) => void;
@@ -497,6 +499,7 @@ function blankPersonal(ownerId: string | null): Partial<CoupleState> {
     tttNoted: "",
     c4Noted: "",
     dotsNoted: "",
+    reversiNoted: "",
     budget: {
       currency: "USD",
       txs: [],
@@ -565,6 +568,7 @@ export const useCouple = create<CoupleState>()(
       tttNoted: "",
       c4Noted: "",
       dotsNoted: "",
+      reversiNoted: "",
       budget: {
         currency: "USD",
         txs: [],
@@ -1088,6 +1092,17 @@ export const useCouple = create<CoupleState>()(
               : { ...wins, partner: wins.partner + 2 };
         set({ gameWins: nextWins, dotsNoted: key });
       },
+      noteReversi: (winner, key) => {
+        if (get().reversiNoted === key) return;
+        const wins = get().gameWins ?? { me: 0, partner: 0 };
+        const nextWins =
+          winner === "draw"
+            ? { me: wins.me + 1, partner: wins.partner + 1 }
+            : winner === "me"
+              ? { ...wins, me: wins.me + 2 }
+              : { ...wins, partner: wins.partner + 2 };
+        set({ gameWins: nextWins, reversiNoted: key });
+      },
       setBudgetCurrency: (code) => set({ budget: { ...get().budget, currency: code } }),
       addBudgetTx: (input) => {
         const budget = get().budget;
@@ -1235,6 +1250,7 @@ export const useCouple = create<CoupleState>()(
           tttNoted: raw.tttNoted ?? "",
           c4Noted: raw.c4Noted ?? "",
           dotsNoted: raw.dotsNoted ?? "",
+          reversiNoted: raw.reversiNoted ?? "",
           people: raw.people ?? [],
           gettingMarried: raw.gettingMarried ?? false,
           weddingDate: raw.weddingDate ?? "",

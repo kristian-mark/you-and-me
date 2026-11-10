@@ -163,6 +163,16 @@
   padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
 }
 
+@keyframes disc-flip {
+  0% { transform: scaleX(1); }
+  40% { transform: scaleX(0.08); }
+  100% { transform: scaleX(1); }
+}
+
+.disc-flip {
+  animation: disc-flip 0.55s ease;
+}
+
 .fixed.inset-0 {
   padding-top: max(1.25rem, env(safe-area-inset-top, 0px));
   padding-right: max(1.25rem, env(safe-area-inset-right, 0px));
