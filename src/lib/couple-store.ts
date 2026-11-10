@@ -276,6 +276,7 @@ type CoupleState = {
   c4Noted: string;
   dotsNoted: string;
   reversiNoted: string;
+  checkersNoted: string;
   budget: BudgetState;
   openTaskId: string | null;
   taskReturn: TabId | null;
@@ -359,6 +360,7 @@ type CoupleState = {
   noteC4: (winner: "me" | "partner" | "draw", key: string) => void;
   noteDots: (winner: "me" | "partner" | "draw", key: string) => void;
   noteReversi: (winner: "me" | "partner" | "draw", key: string) => void;
+  noteCheckers: (winner: "me" | "partner" | "draw", key: string) => void;
   setBudgetCurrency: (code: string) => void;
   addBudgetTx: (input: Omit<BudgetTx, "id" | "createdAt">) => void;
   deleteBudgetTx: (id: string) => void;
@@ -500,6 +502,7 @@ function blankPersonal(ownerId: string | null): Partial<CoupleState> {
     c4Noted: "",
     dotsNoted: "",
     reversiNoted: "",
+    checkersNoted: "",
     budget: {
       currency: "USD",
       txs: [],
@@ -569,6 +572,7 @@ export const useCouple = create<CoupleState>()(
       c4Noted: "",
       dotsNoted: "",
       reversiNoted: "",
+      checkersNoted: "",
       budget: {
         currency: "USD",
         txs: [],
@@ -1103,6 +1107,17 @@ export const useCouple = create<CoupleState>()(
               : { ...wins, partner: wins.partner + 2 };
         set({ gameWins: nextWins, reversiNoted: key });
       },
+      noteCheckers: (winner, key) => {
+        if (get().checkersNoted === key) return;
+        const wins = get().gameWins ?? { me: 0, partner: 0 };
+        const nextWins =
+          winner === "draw"
+            ? { me: wins.me + 1, partner: wins.partner + 1 }
+            : winner === "me"
+              ? { ...wins, me: wins.me + 2 }
+              : { ...wins, partner: wins.partner + 2 };
+        set({ gameWins: nextWins, checkersNoted: key });
+      },
       setBudgetCurrency: (code) => set({ budget: { ...get().budget, currency: code } }),
       addBudgetTx: (input) => {
         const budget = get().budget;
@@ -1251,6 +1266,7 @@ export const useCouple = create<CoupleState>()(
           c4Noted: raw.c4Noted ?? "",
           dotsNoted: raw.dotsNoted ?? "",
           reversiNoted: raw.reversiNoted ?? "",
+          checkersNoted: raw.checkersNoted ?? "",
           people: raw.people ?? [],
           gettingMarried: raw.gettingMarried ?? false,
           weddingDate: raw.weddingDate ?? "",

@@ -4,24 +4,18 @@ import { pieceBg } from "@/lib/pair-color";
 import {
   FLEET_LENGTHS,
   type Bout,
-  type CheckerMove,
   type DCard,
   type DurakState,
-  type Piece,
   type Ship,
   type ShotMap,
   type Side,
   addShip,
-  applyCheckerMove,
   cardLabel,
-  checkerMoves,
   durakApply,
   durakLegal,
-  emptyCheckers,
   fireAt,
   newDurak,
   randomFleet,
-  sameSq,
 } from "@/lib/games";
 
 function useNames() {
@@ -99,66 +93,6 @@ function Outcome({
   );
 }
 
-export function Checkers({ onBack, onAgain }: { onBack: () => void; onAgain: () => void }) {
-  const pieceClass = usePieceClass();
-  const [board, setBoard] = useState<Piece[][]>(emptyCheckers);
-  const [turn, setTurn] = useState<Side>("me");
-  const [quiet, setQuiet] = useState(0);
-  const [from, setFrom] = useState<{ r: number; c: number } | null>(null);
-  const moves = checkerMoves(board, turn);
-  const result: Side | "draw" | null = moves.length === 0 ? (turn === "me" ? "partner" : "me") : quiet >= 60 ? "draw" : null;
-  useAward(result);
-  const mine = from ? moves.filter((m) => sameSq(m.from, from)) : [];
-  const play = (move: CheckerMove) => {
-    const captured = move.steps.some((step) => step.cap);
-    setBoard(applyCheckerMove(board, move));
-    setFrom(null);
-    setQuiet(captured ? 0 : quiet + 1);
-    setTurn(turn === "me" ? "partner" : "me");
-  };
-  return (
-    <Shell title="Шашки" onBack={onBack}>
-      {result ? null : <Turn side={turn} />}
-      <p className="mt-1 text-[13px] text-muted">
-        {moves.some((m) => m.steps.some((s) => s.cap)) ? "Нужно бить. Дамка ходит на любое число клеток." : "Ход по диагонали."}
-      </p>
-      <div className="mt-4 grid grid-cols-8 overflow-hidden rounded-[20px]">
-        {board.map((row, r) =>
-          row.map((piece, c) => {
-            const dark = (r + c) % 2 === 1;
-            const targets = mine.filter((m) => sameSq(m.steps[m.steps.length - 1], { r, c }));
-            const selected = from && sameSq(from, { r, c });
-            return (
-              <button
-                key={`${r}-${c}`}
-                type="button"
-                disabled={!dark || Boolean(result)}
-                onClick={() => {
-                  if (targets.length) {
-                    play(targets[0]);
-                    return;
-                  }
-                  if (piece?.side === turn) setFrom({ r, c });
-                }}
-                className={`grid aspect-square place-items-center ${dark ? "bg-chip" : "bg-bg"} ${selected ? "outline outline-2 outline-cream" : ""}`}
-              >
-                {piece ? (
-                  <span
-                    className={`size-[68%] rounded-full ${pieceClass(piece.side)} ${piece.king ? "outline outline-2 outline-cream" : ""}`}
-                  />
-                ) : targets.length ? (
-                  <span className="size-2.5 rounded-full bg-cream" />
-                ) : null}
-              </button>
-            );
-          }),
-        )}
-      </div>
-      {result ? <Outcome result={result} onAgain={onAgain} /> : null}
-    </Shell>
-  );
-}
-
 function SeaGrid({
   ships,
   shots,
@@ -196,6 +130,7 @@ function SeaGrid({
     </div>
   );
 }
+
 
 export function Battleship({ onBack, onAgain }: { onBack: () => void; onAgain: () => void }) {
   const { name } = useNames();
