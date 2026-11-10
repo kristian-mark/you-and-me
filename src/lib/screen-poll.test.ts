@@ -209,9 +209,15 @@ test("changing the interval does not fetch by itself", async () => {
 });
 
 test("a few poll misses stay quiet and a repeated miss is shown", () => {
-  assert.equal(pollFailureNotice(1, "Не удалось проверить аккаунт"), null);
-  assert.equal(pollFailureNotice(3, "Не удалось проверить аккаунт"), null);
-  assert.equal(pollFailureNotice(4, "Не удалось проверить аккаунт"), "Не удалось проверить аккаунт");
+  assert.equal(pollFailureNotice(1, "Партия повреждена"), null);
+  assert.equal(pollFailureNotice(3, "Партия повреждена"), null);
+  assert.equal(pollFailureNotice(4, "Партия повреждена"), "Партия повреждена");
+});
+
+test("a full database pool never becomes a blocking notice", () => {
+  const raw = "(EMAXCONNSESSION) max clients reached in session mode";
+  assert.equal(pollFailureNotice(8, raw), null);
+  assert.equal(pollFailureNotice(8, "Связь прервалась"), null);
 });
 
 test("refreshOpenScreens is a no-op while hidden and refreshes when visible", async () => {

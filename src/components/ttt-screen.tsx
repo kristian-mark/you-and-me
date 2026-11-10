@@ -5,10 +5,16 @@ import { pieceBorder, pieceText, type PieceColor } from "@/lib/pair-color";
 import { GAME_POLL_MS, pollFailureNotice, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 import { loadTttMatch, openNewTttMatch, playTttMove } from "@/lib/turn/server";
 import { tttBanner, type TttMatchView } from "@/lib/turn/ttt";
-import { userMessage } from "@/lib/user-message";
+import { isConnectionFailure, userMessage } from "@/lib/user-message";
 
 function textOf(error: unknown) {
   return userMessage(error, "Не вышло связаться с партией");
+}
+
+function showFailure(error: unknown, setNotice: (value: string) => void) {
+  const text = textOf(error);
+  if (isConnectionFailure(text)) return;
+  setNotice(text);
 }
 
 function Cross({ tone }: { tone: PieceColor }) {
@@ -110,7 +116,7 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
       })
       .catch((error: unknown) => {
         noticeFromPoll.current = false;
-        setNotice(textOf(error));
+        showFailure(error, setNotice);
         return loadTttMatch()
           .then((next) => setView(next))
           .catch(() => undefined);
@@ -131,7 +137,7 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
       .then((next) => setView(next))
       .catch((error: unknown) => {
         noticeFromPoll.current = false;
-        setNotice(textOf(error));
+        showFailure(error, setNotice);
         return loadTttMatch()
           .then((next) => setView(next))
           .catch(() => undefined);
@@ -154,7 +160,7 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
       })
       .catch((error: unknown) => {
         noticeFromPoll.current = false;
-        setNotice(textOf(error));
+        showFailure(error, setNotice);
         return loadTttMatch()
           .then((next) => setView(next))
           .catch(() => undefined);

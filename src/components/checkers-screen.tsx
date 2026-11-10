@@ -5,10 +5,16 @@ import { pieceBg, type PieceColor } from "@/lib/pair-color";
 import { GAME_POLL_MS, pollFailureNotice, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 import { CHECK_SIZE, checkersBanner, type CheckersMatchView } from "@/lib/turn/checkers";
 import { loadCheckersMatch, openNewCheckersMatch, playCheckersMove } from "@/lib/turn/server";
-import { userMessage } from "@/lib/user-message";
+import { isConnectionFailure, userMessage } from "@/lib/user-message";
 
 function textOf(error: unknown) {
   return userMessage(error, "Не вышло связаться с партией");
+}
+
+function showFailure(error: unknown, setNotice: (value: string) => void) {
+  const text = textOf(error);
+  if (isConnectionFailure(text)) return;
+  setNotice(text);
 }
 
 function absoluteOf(display: number, flip: boolean) {
@@ -168,7 +174,7 @@ export function CheckersMatch({ onBack }: { onBack: () => void; onAgain?: () => 
         .then((next) => take(next))
         .catch((error: unknown) => {
           noticeFromPoll.current = false;
-          setNotice(textOf(error));
+          showFailure(error, setNotice);
           return reconcile();
         })
         .finally(() => {
@@ -251,7 +257,7 @@ export function CheckersMatch({ onBack }: { onBack: () => void; onAgain?: () => 
                     .then((next) => setView(next))
                     .catch((error: unknown) => {
                       noticeFromPoll.current = false;
-                      setNotice(textOf(error));
+                      showFailure(error, setNotice);
                       return reconcile();
                     })
                     .finally(() => {

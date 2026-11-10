@@ -1,4 +1,5 @@
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
+import { getSharedPgPool } from "./pg-pool";
 
 /** Which database backend is active. */
 export type DbSource = "neon" | "pglite";
@@ -87,24 +88,7 @@ function toSql(run: Run): Sql {
 
 function createNeonSql(): Promise<Sql> {
   globalRef.__pgSqlPromise__ ??= (async () => {
-    // Regular Postgres driver: node-postgres (`pg`) — works directly with Neon's
-    // pooled endpoint. One pool per process; warm serverless instances reuse it.
-    const { Pool, types } = await import("pg");
-    types.setTypeParser(OID_INT8, Number);
-    types.setTypeParser(OID_DATE, identity);
-    types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool({
-      connectionString: databaseUrl,
-      // Supabase session mode allows about 15 clients. A warm Vercel
-      // instance keeps an idle pool client open (timers pause while the
-      // isolate is frozen), so each query takes a fresh connection and
-      // closes it instead of holding a slot.
-      max: 1,
-      maxUses: 1,
-      idleTimeoutMillis: 1_000,
-      connectionTimeoutMillis: 4_000,
-      allowExitOnIdle: true,
-    });
+    const pool = getSharedPgPool(databaseUrl as string);
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
       return res.rows as T[];

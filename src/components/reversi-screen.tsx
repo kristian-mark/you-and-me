@@ -5,10 +5,16 @@ import { pieceBg, pieceBorder, type PieceColor } from "@/lib/pair-color";
 import { GAME_POLL_MS, pollFailureNotice, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 import { REV, reversiBanner, type RevMark, type RevMatchView } from "@/lib/turn/reversi";
 import { loadReversiMatch, openNewReversiMatch, playReversiMove } from "@/lib/turn/server";
-import { userMessage } from "@/lib/user-message";
+import { isConnectionFailure, userMessage } from "@/lib/user-message";
 
 function textOf(error: unknown) {
   return userMessage(error, "Не вышло связаться с партией");
+}
+
+function showFailure(error: unknown, setNotice: (value: string) => void) {
+  const text = textOf(error);
+  if (isConnectionFailure(text)) return;
+  setNotice(text);
 }
 
 function tone(owner: RevMark, colors: { me: PieceColor; partner: PieceColor }) {
@@ -152,7 +158,7 @@ export function ReversiMatch({ onBack }: { onBack: () => void; onAgain?: () => v
       .then((next) => take(next))
       .catch((error: unknown) => {
         noticeFromPoll.current = false;
-        setNotice(textOf(error));
+        showFailure(error, setNotice);
         return reconcile();
       })
       .finally(() => {
@@ -171,7 +177,7 @@ export function ReversiMatch({ onBack }: { onBack: () => void; onAgain?: () => v
       .then((next) => setView(next))
       .catch((error: unknown) => {
         noticeFromPoll.current = false;
-        setNotice(textOf(error));
+        showFailure(error, setNotice);
         return reconcile();
       })
       .finally(() => {

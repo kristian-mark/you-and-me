@@ -118,6 +118,10 @@ export async function assertKnownUser(userId: string) {
     exists = rows.length > 0;
   } catch (error) {
     console.error("[auth] could not check the user row", error);
+    const detail = error instanceof Error ? error.message : "";
+    if (/EMAXCONNSESSION|max clients|ECONNRESET|ETIMEDOUT|ECONNREFUSED|Connection terminated|too many clients|remaining connection slots/i.test(detail)) {
+      throw new Error("Связь прервалась");
+    }
     throw new Error("Не удалось проверить аккаунт");
   }
   if (exists) {
