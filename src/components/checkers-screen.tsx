@@ -193,7 +193,7 @@ export function CheckersMatch({ onBack }: { onBack: () => void; onAgain?: () => 
 
   return (
     <section className="fixed inset-0 z-30 flex flex-col overflow-hidden bg-bg" data-status={view?.status ?? "loading"}>
-      <div className="app-frame flex min-h-0 w-full flex-1 flex-col overflow-y-auto px-5 pb-6">
+      <div className="app-frame flex min-h-0 w-full flex-1 flex-col overflow-y-auto pb-6">
         <header className="grid shrink-0 grid-cols-[auto_1fr_auto] items-center gap-2 pt-2">
           <button type="button" onClick={onBack} className="inline-flex min-h-11 items-center pr-2 text-[17px] text-[#e6e1d6]">
             ‹ Игры
@@ -229,15 +229,15 @@ export function CheckersMatch({ onBack }: { onBack: () => void; onAgain?: () => 
 
             <div className="mt-4 rounded-[22px] bg-raised px-4 py-4">
               <p className="text-[11px] tracking-[0.16em] text-muted uppercase">Ваш счёт</p>
-              <div className="mt-3 flex items-center gap-3">
+              <div className="mt-3 flex items-center gap-2">
                 <span className={`size-3 shrink-0 rounded-full ${pieceBg(colors.me)}`} />
-                <span className="min-w-0 flex-1 truncate text-[16px]">{myName}</span>
-                <span className="shrink-0 text-[22px] font-semibold tracking-wide">
+                <span className="min-w-[4.75rem] flex-1 truncate text-[15px]">{myName}</span>
+                <span className="shrink-0 text-[18px] font-semibold tabular-nums">
                   {view.score.me}
-                  <span className="px-2 text-[#e6e1d6]">:</span>
+                  <span className="px-1 text-[#e6e1d6]">:</span>
                   {view.score.partner}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-right text-[16px]">{partnerName}</span>
+                <span className="min-w-[4.75rem] flex-1 truncate text-right text-[15px]">{partnerName}</span>
                 <span className={`size-3 shrink-0 rounded-full ${pieceBg(colors.partner)}`} />
               </div>
             </div>

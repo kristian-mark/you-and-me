@@ -159,6 +159,12 @@
   padding-right: env(safe-area-inset-right, 0px);
 }
 
+/* px-5 on the same element was losing to the rule above, so side padding became 0. */
+.safe-pad.px-5 {
+  padding-left: max(1.25rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1.25rem, env(safe-area-inset-right, 0px));
+}
+
 .pb-28 {
   padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
 }
