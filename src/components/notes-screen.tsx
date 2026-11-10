@@ -65,9 +65,9 @@ export function NotesScreen({ onBack }: { onBack: () => void }) {
         <button type="button" onClick={onBack} className="pt-5 text-left text-muted">
           ‹ Ещё
         </button>
-        <div className="mt-2 flex items-center justify-between">
-          <h1 className="text-[32px] font-semibold">Заметки</h1>
-          <div className="flex items-center gap-2">
+        <div className="mt-2 flex min-w-0 items-center gap-2">
+          <h1 className="min-w-0 flex-1 truncate text-[32px] font-semibold">Заметки</h1>
+          <div className="flex shrink-0 items-center gap-1.5">
             <button type="button" onClick={() => setSheet("new")} className="grid size-10 place-items-center rounded-xl bg-raised">
               <Plus className="size-5" />
             </button>
@@ -91,9 +91,9 @@ export function NotesScreen({ onBack }: { onBack: () => void }) {
       <button type="button" onClick={onBack} className="pt-5 text-left text-muted">
         ‹ Ещё
       </button>
-      <div className="mt-2 flex items-center justify-between">
-        <h1 className="text-[32px] font-semibold">Заметки</h1>
-        <div className="flex items-center gap-2">
+      <div className="mt-2 flex min-w-0 items-center gap-2">
+        <h1 className="min-w-0 flex-1 truncate text-[32px] font-semibold">Заметки</h1>
+        <div className="flex shrink-0 items-center gap-1.5">
           <button type="button" onClick={() => setSheet("new")} className="grid size-10 place-items-center rounded-xl bg-raised">
             <Plus className="size-5" />
           </button>

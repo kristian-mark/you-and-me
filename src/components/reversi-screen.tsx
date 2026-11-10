@@ -5,6 +5,7 @@ import { pieceBg, pieceBorder, type PieceColor } from "@/lib/pair-color";
 import { GAME_POLL_MS, pollFailureNotice, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 import { REV, reversiBanner, type RevMark, type RevMatchView } from "@/lib/turn/reversi";
 import { loadReversiMatch, openNewReversiMatch, playReversiMove } from "@/lib/turn/server";
+import { ScoreLine } from "@/components/score-line";
 import { isConnectionFailure, userMessage } from "@/lib/user-message";
 
 function textOf(error: unknown) {
@@ -225,18 +226,17 @@ export function ReversiMatch({ onBack }: { onBack: () => void; onAgain?: () => v
               {status}
             </p>
 
-            <div className="mt-4 rounded-[22px] bg-raised px-4 py-4">
+            <div className="mt-4 min-w-0 rounded-[22px] bg-raised px-3 py-4 sm:px-4">
               <p className="text-[11px] tracking-[0.16em] text-muted uppercase">Ваш счёт</p>
-              <div className="mt-3 flex items-center gap-2">
-                <span className={`size-3 shrink-0 rounded-full ${pieceBg(colors.me)}`} />
-                <span className="min-w-[4.75rem] flex-1 truncate text-[15px]">{myName}</span>
-                <span className="shrink-0 text-[18px] font-semibold tabular-nums">
-                  {view.score.me}
-                  <span className="px-1 text-[#e6e1d6]">:</span>
-                  {view.score.partner}
-                </span>
-                <span className="min-w-[4.75rem] flex-1 truncate text-right text-[15px]">{partnerName}</span>
-                <span className={`size-3 shrink-0 rounded-full ${pieceBg(colors.partner)}`} />
+              <div className="mt-3">
+                <ScoreLine
+                  myName={myName}
+                  partnerName={partnerName}
+                  mine={view.score.me}
+                  theirs={view.score.partner}
+                  myTone={pieceBg(colors.me)}
+                  partnerTone={pieceBg(colors.partner)}
+                />
               </div>
             </div>
 
