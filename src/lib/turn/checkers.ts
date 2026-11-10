@@ -227,15 +227,15 @@ export function readCheckersState(raw: unknown): CheckersState {
   };
 }
 
-function placeOpening(seat: Seat) {
+/** Seat a always sits on rows 5–7, seat b on rows 0–2. The starter only takes the first move. */
+function placeOpening() {
   const board = emptyCheckersState().board;
-  const other = otherSeat(seat);
   for (let row = 0; row < CHECK_SIZE; row += 1) {
     for (let column = 0; column < CHECK_SIZE; column += 1) {
       if ((row + column) % 2 === 0) continue;
       const index = checkIndex(row, column);
-      if (row < 3) board[index] = encode(other, false);
-      else if (row > 4) board[index] = encode(seat, false);
+      if (row < 3) board[index] = encode("b", false);
+      else if (row > 4) board[index] = encode("a", false);
     }
   }
   return board;
@@ -304,7 +304,7 @@ export function beginCheckers(previous: CheckersState, seat: Seat): TurnStep<Che
   return {
     state: {
       ...emptyCheckersState(),
-      board: placeOpening(seat),
+      board: placeOpening(),
       starter: seat,
       wins: { a: previous.wins.a, b: previous.wins.b },
       draws: previous.draws,

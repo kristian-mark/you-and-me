@@ -6,6 +6,7 @@ import {
   checkersRules,
   checkIndex,
   emptyCheckersState,
+  presentCheckers,
   type CheckCell,
   type CheckersState,
 } from "./checkers.ts";
@@ -48,6 +49,33 @@ test("the starter moves a man one square forward, and the other seat waits", () 
   assert.throws(() => play(back, checkIndex(4, 1), checkIndex(5, 2)), (error: unknown) => {
     return error instanceof TurnRuleError && error.code === "illegal";
   });
+});
+
+test("the partner starts the rematch on their own side", () => {
+  const opened = beginCheckers(emptyCheckersState(), "b");
+  assert.equal(opened.turn, "b");
+  assert.equal(opened.state.starter, "b");
+  assert.equal(opened.state.board[checkIndex(2, 1)], "b");
+  assert.equal(opened.state.board[checkIndex(5, 0)], "a");
+  const match = snap(opened.state, "b");
+  assert.throws(() => checkersRules.apply(match, "a", { from: checkIndex(5, 0), to: checkIndex(4, 1) }), (error: unknown) => {
+    return error instanceof TurnRuleError && error.code === "turn";
+  });
+  const next = play(match, checkIndex(2, 1), checkIndex(3, 0));
+  assert.equal(next.turn, "a");
+  assert.equal(next.state.board[checkIndex(3, 0)], "b");
+
+  const viewB = presentCheckers(match, 1, "b", null);
+  assert.equal(viewB.myTurn, true);
+  assert.equal(viewB.flip, true);
+  assert.ok(viewB.moves.some((move) => move.from === checkIndex(2, 1)));
+  assert.equal(viewB.board[checkIndex(0, 1)], "me");
+  const viewA = presentCheckers(match, 1, "a", null);
+  assert.equal(viewA.myTurn, false);
+  assert.equal(viewA.flip, false);
+  assert.equal(viewA.board[checkIndex(5, 0)], "me");
+  assert.equal(viewA.board[checkIndex(0, 1)], "partner");
+  assert.equal(viewA.moves.length, 0);
 });
 
 test("a capture is forced, including backward, and a quiet step is refused", () => {
