@@ -58,6 +58,7 @@ import {
   newSeaMatch,
   presentSea,
   readSeaState,
+  rebaseSeaSetup,
   seaMayAct,
   type SeaMatchView,
   type SeaMove,
@@ -189,6 +190,8 @@ type MatchKit<TState, TView> = {
   idle: () => TView;
   apply: (snapshot: TurnSnapshot<TState>, seat: Seat, move: unknown) => TurnStep<TState>;
   mayAct?: (snapshot: TurnSnapshot<TState>, seat: Seat, move: unknown) => boolean;
+  /** When the client version is stale, replay this move on the latest row. Null keeps the strict conflict. */
+  rebase?: (snapshot: TurnSnapshot<TState>, seat: Seat, move: unknown) => TurnStep<TState> | null;
   repair?: (snapshot: TurnSnapshot<TState>) => TurnStep<TState> | null;
 };
 
@@ -224,27 +227,35 @@ function createMatch<TState, TView>(kit: MatchKit<TState, TView>) {
 
   async function play(userId: string, move: unknown, version: number): Promise<TView> {
     const { pair, pairId, seat } = await requirePair(userId);
-    const row = await loadRow(pairId, kit.game);
+    let row = await loadRow(pairId, kit.game);
     if (!row) throw new TurnRuleError("turn", "Сначала начни игру");
-    const current = toSnapshot(row, pair, kit.read);
-    if (current.version !== version) throw new TurnConflictError();
-    const relaxed = kit.mayAct?.(current.snapshot, seat, move) ?? false;
-    if (!relaxed) {
-      if (!row.turn_user_id) throw new TurnRuleError("turn", "Сначала начни игру");
-      if (row.turn_user_id !== userId) throw new TurnRuleError("turn", "Сейчас ход партнёра");
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const current = toSnapshot(row, pair, kit.read);
+      const stale = current.version !== version;
+      const rebasing = stale ? (kit.rebase?.(current.snapshot, seat, move) ?? null) : null;
+      if (stale && !rebasing) throw new TurnConflictError();
+      const relaxed = Boolean(rebasing) || (kit.mayAct?.(current.snapshot, seat, move) ?? false);
+      if (!relaxed) {
+        if (!row.turn_user_id) throw new TurnRuleError("turn", "Сначала начни игру");
+        if (row.turn_user_id !== userId) throw new TurnRuleError("turn", "Сейчас ход партнёра");
+      }
+      const step = rebasing ?? kit.apply(current.snapshot, seat, move);
+      const now = new Date().toISOString();
+      const guard = relaxed ? "status=eq.active" : `status=eq.active&${eqFilter("turn_user_id", userId)}`;
+      const saved = await compareAndSwap(
+        pairId,
+        kit.game,
+        current.version,
+        guard,
+        fields(pair, step, current.version + 1, now),
+      );
+      if (saved) return show(step, current.version + 1, seat, saved.updated_at ?? now);
+      if (!relaxed) throw new TurnConflictError();
+      const fresh = await loadRow(pairId, kit.game);
+      if (!fresh) throw new TurnConflictError();
+      row = fresh;
     }
-    const step = kit.apply(current.snapshot, seat, move);
-    const now = new Date().toISOString();
-    const guard = relaxed ? "status=eq.active" : `status=eq.active&${eqFilter("turn_user_id", userId)}`;
-    const saved = await compareAndSwap(
-      pairId,
-      kit.game,
-      current.version,
-      guard,
-      fields(pair, step, current.version + 1, now),
-    );
-    if (!saved) throw new TurnConflictError();
-    return show(step, current.version + 1, seat, saved.updated_at ?? now);
+    throw new TurnConflictError();
   }
 
   async function open(userId: string, version: number): Promise<TView> {
@@ -348,6 +359,7 @@ const seaMatch = createMatch<SeaState, SeaMatchView>({
   present: presentSea,
   idle: idleSeaView,
   mayAct: seaMayAct,
+  rebase: rebaseSeaSetup,
   apply: (snapshot, seat, move) => turnGames.sea.apply(snapshot, seat, move as SeaMove),
 });
 

@@ -245,6 +245,16 @@ export function seaMayAct(snapshot: TurnSnapshot<SeaState>, seat: Seat, move: un
   return !readyOf(snapshot.state, seat);
 }
 
+/**
+ * Setup only touches this seat's fleet and ready flag, so it can land on the
+ * latest row after the partner reshuffles or readies. Shots return null and
+ * keep the strict version check.
+ */
+export function rebaseSeaSetup(latest: TurnSnapshot<SeaState>, seat: Seat, move: unknown): TurnStep<SeaState> | null {
+  if (!seaMayAct(latest, seat, move)) return null;
+  return seaRules.apply(latest, seat, move as SeaMove);
+}
+
 function cellsFor(ships: number[][] | null, board: string, revealShips: boolean): SeaCell[] {
   return Array.from({ length: SEA_CELLS }, (_, index) => {
     const mark = board[index];
@@ -265,6 +275,7 @@ export function presentSea(
   const mineShips = shipsOf(snapshot.state, seat);
   const targetShots = shotsOf(snapshot.state, otherSeat(seat));
   const mineShots = shotsOf(snapshot.state, seat);
+  const over = snapshot.status === "finished";
   return {
     version,
     updatedAt,
@@ -274,7 +285,7 @@ export function presentSea(
     winner: snapshot.winner === "draw" ? null : snapshot.winner ? (snapshot.winner === seat ? "me" : "partner") : null,
     ready: { me: readyOf(snapshot.state, seat), partner: readyOf(snapshot.state, otherSeat(seat)) },
     mine: cellsFor(mineShips, mineShots, true),
-    target: cellsFor(null, targetShots, false),
+    target: cellsFor(over ? shipsOf(snapshot.state, otherSeat(seat)) : null, targetShots, over),
     wins: {
       me: seat === "a" ? snapshot.state.wins.a : snapshot.state.wins.b,
       partner: seat === "a" ? snapshot.state.wins.b : snapshot.state.wins.a,

@@ -32,12 +32,12 @@ paint(8, 0, "miss");
 
 function SeaBoard({
   cells,
-  mine,
+  board,
   colors,
   onCell,
 }: {
   cells: SeaCell[];
-  mine: boolean;
+  board: "mine" | "target";
   colors: { me: PieceColor; partner: PieceColor };
   onCell?: (index: number) => void;
 }) {
@@ -56,7 +56,11 @@ function SeaBoard({
             const index = row * SEA + col;
             const cell = cells[index] ?? "empty";
             const shot = cell === "hit" || cell === "sunk";
-            const tone = shot ? pieceBg(mine ? colors.partner : colors.me) : cell === "ship" ? pieceBg(colors.me) : "bg-[#12141a]";
+            const tone = shot
+              ? pieceBg(board === "mine" ? colors.partner : colors.me)
+              : cell === "ship"
+                ? pieceBg(board === "mine" ? colors.me : colors.partner)
+                : "bg-[#12141a]";
             return (
               <button
                 key={col}
@@ -81,7 +85,7 @@ function SeaBoard({
 function PreviewCard() {
   return (
     <div className="rounded-[28px] bg-[#16181e] px-3 py-3">
-      <SeaBoard cells={PREVIEW} mine={false} colors={{ me: "blue", partner: "pink" }} />
+      <SeaBoard cells={PREVIEW} board="target" colors={{ me: "blue", partner: "pink" }} />
     </div>
   );
 }
@@ -225,7 +229,18 @@ export function SeaMatch({ onBack }: { onBack: () => void; onAgain?: () => void 
           </div>
         ) : (
           <>
-            {playing && view.phase === "fight" ? (
+            {view.status === "finished" ? (
+              <div className="mt-2 space-y-3">
+                <div className="rounded-[28px] bg-[#16181e] px-2 py-3 sm:px-3">
+                  <p className="mb-2 px-1 text-[12px] text-muted">Поле партнёра</p>
+                  <SeaBoard cells={view.target} board="target" colors={colors} />
+                </div>
+                <div className="rounded-[28px] bg-[#16181e] px-2 py-3 sm:px-3">
+                  <p className="mb-2 px-1 text-[12px] text-muted">Моё поле</p>
+                  <SeaBoard cells={view.mine} board="mine" colors={colors} />
+                </div>
+              </div>
+            ) : playing && view.phase === "fight" ? (
               <div className={`mt-2 ${pending ? "opacity-70" : ""}`}>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -246,7 +261,7 @@ export function SeaMatch({ onBack }: { onBack: () => void; onAgain?: () => void 
                 <div className="mt-3 rounded-[28px] bg-[#16181e] px-2 py-3 sm:px-3">
                   <SeaBoard
                     cells={pane === "mine" ? view.mine : view.target}
-                    mine={pane === "mine"}
+                    board={pane === "mine" ? "mine" : "target"}
                     colors={colors}
                     onCell={pane === "target" && view.myTurn ? (index) => send({ kind: "shot", index }) : undefined}
                   />
@@ -254,7 +269,7 @@ export function SeaMatch({ onBack }: { onBack: () => void; onAgain?: () => void 
               </div>
             ) : playing ? (
               <div className={`mt-2 rounded-[28px] bg-[#16181e] px-2 py-3 sm:px-3 ${pending ? "opacity-70" : ""}`}>
-                <SeaBoard cells={view.mine} mine colors={colors} />
+                <SeaBoard cells={view.mine} board="mine" colors={colors} />
               </div>
             ) : (
               <div className="mt-2">

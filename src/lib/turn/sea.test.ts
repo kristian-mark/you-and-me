@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { beginSea, fleetIsValid, placeFleet, presentSea, seaRules, type SeaState } from "./sea.ts";
+import { beginSea, fleetIsValid, placeFleet, presentSea, rebaseSeaSetup, seaRules, type SeaState } from "./sea.ts";
 import type { TurnSnapshot } from "./engine.ts";
 
 function rng(seed: number) {
@@ -63,10 +63,13 @@ test("a hit keeps the turn, a miss gives it away, and a sunk ship marks the ring
   assert.equal(step.state.shotsB[55], "s");
   assert.equal(step.state.shotsB[45], "m");
   assert.equal(step.state.shotsB[65], "m");
+  const fighting = presentSea({ state: miss.state, status: "active", turn: "b", winner: null }, 3, "a", null);
+  assert.equal(fighting.target.some((cell) => cell === "ship"), false);
   const view = presentSea({ state: step.state, status: step.status, turn: step.turn, winner: step.winner }, 4, "b", null);
   assert.equal(view.winner, "partner");
   assert.equal(view.mine[55], "sunk");
-  assert.equal(view.target.some((cell) => cell === "ship"), false);
+  assert.equal(view.target[0], "ship");
+  assert.equal(view.target[3], "ship");
 });
 
 test("setup can be reshuffled until ready, then the starter shoots first", () => {
@@ -84,4 +87,25 @@ test("setup can be reshuffled until ready, then the starter shoots first", () =>
   const readyB = seaRules.apply(readyA, "b", { kind: "ready" });
   assert.equal(readyB.state.phase, "fight");
   assert.equal(readyB.turn, "a");
+});
+
+test("a setup action still lands after the partner reshuffles on a newer version", () => {
+  const start = snap({
+    ...seaRules.empty(),
+    shipsA: placeFleet(rng(4)),
+    shipsB: placeFleet(rng(11)),
+    starter: "a",
+  });
+  const partner = seaRules.apply(start, "b", { kind: "reshuffle" });
+  const latest = snap(partner.state, partner.turn);
+  const ready = rebaseSeaSetup(latest, "a", { kind: "ready" });
+  assert.ok(ready);
+  assert.equal(ready.state.readyA, true);
+  assert.equal(ready.state.readyB, false);
+  assert.deepEqual(ready.state.shipsA, partner.state.shipsA);
+  assert.deepEqual(ready.state.shipsB, partner.state.shipsB);
+  const both = rebaseSeaSetup(snap(ready.state, ready.turn), "b", { kind: "ready" });
+  assert.equal(both?.state.phase, "fight");
+  assert.equal(both?.state.readyA, true);
+  assert.equal(rebaseSeaSetup(snap(both!.state, "a"), "a", { kind: "shot", index: 0 }), null);
 });
