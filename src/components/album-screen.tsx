@@ -41,7 +41,7 @@ import {
   type TrashPhoto,
 } from "@/lib/album-server";
 import { useCouple, usePlayerColors } from "@/lib/couple-store";
-import { pieceBg } from "@/lib/pair-color";
+import { pieceBg, pieceText } from "@/lib/pair-color";
 import { LIST_POLL_MS, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 
 type Page = "home" | "all" | "album" | "space" | "trash" | "new" | "cover" | "library" | "assign";
@@ -1225,7 +1225,7 @@ function Viewer({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, onStep]);
-  const liked = photo.likedByMe || photo.likedByPartner;
+  const colors = usePlayerColors();
   return (
     <div
       className="fixed inset-0 z-40 flex flex-col bg-black"
@@ -1282,7 +1282,7 @@ function Viewer({
         </p>
         <p className="mt-1 text-[13px] text-muted">{viewerStamp(photo.takenAt)}</p>
         {photo.likedByPartner && !photo.likedByMe ? (
-          <p className="mt-1 text-[13px] text-pink">нравится партнёру</p>
+          <p className={`mt-1 text-[13px] ${pieceText(colors.partner)}`}>нравится партнёру</p>
         ) : null}
         <div className="mt-4 grid grid-cols-4 text-center text-[12px] text-white/80">
           <button
@@ -1291,7 +1291,7 @@ function Viewer({
             className="flex min-h-14 flex-col items-center gap-1"
           >
             <Heart
-              className={`size-6 ${photo.likedByMe ? "fill-current text-cream" : liked ? "text-pink" : ""}`}
+              className={`size-6 ${photo.likedByMe ? "fill-current text-cream" : photo.likedByPartner ? pieceText(colors.partner) : ""}`}
             />
             Нравится
           </button>

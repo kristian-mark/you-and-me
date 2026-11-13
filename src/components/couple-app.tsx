@@ -56,8 +56,7 @@ function PairGate() {
   const pushedAnniversary = useRef("");
   const pushedEmail = useRef("");
 
-  // Names, birthdays, email, together_since, and who is in the pair can change.
-  // Piece colors are fixed in the UI (you blue, partner pink) and are not stored.
+  // Names, birthdays, email, colors, together_since, and who is in the pair can change.
   // A paired tab checks on open and every 4 hours. The invite screen stays fast.
   const waitingForPartner = Boolean(profile && !profile.partner);
   const canPollProfile = !needsLogin && !(authEnabled && isPending);
@@ -69,8 +68,8 @@ function PairGate() {
       setProfile(next);
       setNeedsLogin(false);
       setError("");
-      const mine = profileName(next.displayName, next.email ?? user?.primaryEmail ?? null, FALLBACK_MY_NAME);
-      const partner = profileName(next.partner?.displayName, null, FALLBACK_PARTNER_NAME);
+      const mine = profileName(next.displayName, next.handle ?? next.email ?? user?.primaryEmail ?? null, FALLBACK_MY_NAME);
+      const partner = profileName(next.partner?.displayName, next.partner?.handle ?? null, FALLBACK_PARTNER_NAME);
       const localAnniversary = useCouple.getState().anniversaryDate;
       applyCoupleIdentity({
         myName: mine,

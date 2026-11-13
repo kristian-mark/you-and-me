@@ -3,7 +3,8 @@ import { Check, Folder, FolderMinus, Plus, Search } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { ru } from "date-fns/locale";
 import { EmptyState, UsBadge } from "@/components/ui/shell";
-import { useCouple, type Note } from "@/lib/couple-store";
+import { useCouple, usePlayerColors, type Note } from "@/lib/couple-store";
+import { pieceText } from "@/lib/pair-color";
 
 const FOLDER_COLORS = ["#e58aae", "#4aa3e8", "#2cb5b0", "#5dce8a", "#8b8b92"];
 
@@ -176,6 +177,7 @@ function FolderNotes({
   onAdd: () => void;
 }) {
   const myName = useCouple((s) => s.myName);
+  const colors = usePlayerColors();
   const [tag, setTag] = useState<string | "all">("all");
   const tags = [...new Set(notes.flatMap((n) => n.tags))];
   const visible = tag === "all" ? notes : notes.filter((n) => n.tags.includes(tag));
@@ -220,7 +222,7 @@ function FolderNotes({
             >
               <p className="text-[17px] font-medium">{note.title}</p>
               <p className="mt-2 text-[13px] text-muted">
-                {noteStamp(note.createdAt)} · <span className="text-blue">●</span> {myName}
+                {noteStamp(note.createdAt)} · <span className={pieceText(colors.me)}>●</span> {myName}
                 {note.tags[0] ? ` · #${note.tags[0]}` : ""}
               </p>
             </button>

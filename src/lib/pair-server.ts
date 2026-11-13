@@ -10,6 +10,8 @@ export type PairProfile = {
   userId: string;
   email: string | null;
   displayName: string | null;
+  /** Mailbox name, used only when no display name was saved. */
+  handle: string | null;
   inviteCode: string;
   birthday: string | null;
   color: PieceColor | null;
@@ -20,15 +22,19 @@ export type PairProfile = {
   partner: {
     userId: string;
     displayName: string | null;
+    handle: string | null;
     inviteCode: string;
     birthday: string | null;
     color: PieceColor | null;
   } | null;
 };
 
-function labelOf(row: ProfileRow) {
+function savedName(row: ProfileRow) {
   const name = row.display_name?.trim();
-  if (name) return name;
+  return name || null;
+}
+
+function handleOf(row: ProfileRow) {
   const local = row.email?.split("@")[0]?.trim();
   return local || null;
 }
@@ -49,7 +55,8 @@ async function profileView(userId: string): Promise<PairProfile> {
       if (them) {
         partner = {
           userId: them.user_id,
-          displayName: labelOf(them),
+          displayName: savedName(them),
+          handle: handleOf(them),
           inviteCode: them.invite_code,
           birthday: them.birthday,
           color: parsePieceColor(them.color),
@@ -60,7 +67,8 @@ async function profileView(userId: string): Promise<PairProfile> {
   return {
     userId: me.profile.user_id,
     email: me.profile.email,
-    displayName: labelOf(me.profile),
+    displayName: savedName(me.profile),
+    handle: handleOf(me.profile),
     inviteCode: me.profile.invite_code,
     birthday: me.profile.birthday,
     color: parsePieceColor(me.profile.color),
@@ -197,6 +205,8 @@ export const leavePairRemote = createServerFn({ method: "POST" })
       if (wish.photo_path?.startsWith(`${pairId}/`)) await removeWishPhoto(wish.photo_path);
     }
     await deleteCoupleGames(pairId);
+    await sbDelete("app_daily_answers", eqFilter("pair_id", pairId));
+    await sbDelete("app_daily_open", eqFilter("pair_id", pairId));
     await sbDelete("app_pairs", eqFilter("id", pairId));
     await sbDelete("app_tasks", eqFilter("pair_id", pairId));
     await sbDelete("app_wishes", eqFilter("pair_id", pairId));

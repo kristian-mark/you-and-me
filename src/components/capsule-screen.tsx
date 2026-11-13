@@ -13,7 +13,8 @@ import {
 } from "date-fns";
 import { ru } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, LockKeyhole, PencilLine } from "lucide-react";
-import { useCouple, type Capsule } from "@/lib/couple-store";
+import { useCouple, usePlayerColors, type Capsule } from "@/lib/couple-store";
+import { pieceBg } from "@/lib/pair-color";
 import { togetherDay } from "@/lib/pair-identity";
 
 function daysWord(n: number) {
@@ -132,6 +133,7 @@ function CapsuleRow({
 
 function WriteCapsule({ onClose }: { onClose: () => void }) {
   const partnerName = useCouple((s) => s.partnerName);
+  const colors = usePlayerColors();
   const anniversaryDate = useCouple((s) => s.anniversaryDate);
   const pairedAt = useCouple((s) => s.pairedAt);
   const addCapsule = useCouple((s) => s.addCapsule);
@@ -178,8 +180,8 @@ function WriteCapsule({ onClose }: { onClose: () => void }) {
       <div className="mt-6 flex items-center justify-between rounded-[22px] bg-raised px-4 py-4">
         <span className="text-[16px] text-muted">Кому</span>
         <span className="flex items-center gap-2">
-          <span className="size-3 rounded-full bg-pink" />
-          <span className="text-[16px]">{partnerName}</span>
+          <span className={`size-3 shrink-0 rounded-full ${pieceBg(colors.partner)}`} />
+          <span className="min-w-0 truncate text-[16px]">{partnerName}</span>
         </span>
       </div>
 

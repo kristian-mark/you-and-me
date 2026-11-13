@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { pickQuestion, questionById } from "@/lib/daily-questions";
+import { pickQuestion } from "@/lib/daily-questions";
+import { pairDayKey } from "@/lib/daily-sync";
 import { pairColors, type PieceColor } from "@/lib/pair-color";
 import {
   DEMO_ANNIVERSARY,
@@ -228,6 +229,8 @@ export type DailyState = {
   partnerAt?: string;
   skippedIds: string[];
   history: DailyEntry[];
+  /** True when the partner's answer is stored, even while the text is still hidden. */
+  partnerAnswered?: boolean;
 };
 
 type CoupleState = {
@@ -351,8 +354,8 @@ type CoupleState = {
   setQuiz: (patch: Partial<QuizState>) => void;
   resetQuiz: () => void;
   ensureDaily: () => void;
-  answerDaily: (text: string, who?: "me" | "partner") => void;
-  skipDaily: () => void;
+  answerDaily: (text: string) => void;
+  setDaily: (daily: DailyState) => void;
   addCard: (input: { title: string; number: string; kind: CardKind; color: string }) => void;
   updateCard: (id: string, input: Partial<LoyaltyCard>) => void;
   deleteCard: (id: string) => void;
@@ -990,62 +993,31 @@ export const useCouple = create<CoupleState>()(
           quiz: { index: 0, myAnswers: [], partnerAnswers: [], consented: false },
         }),
       ensureDaily: () => {
-        const today = new Date().toISOString().slice(0, 10);
         const daily = get().daily;
-        if (daily.date === today && daily.questionId) return;
-        const history = [...(daily.history ?? [])];
-        if (daily.date && daily.date !== today && (daily.myAnswer || daily.partnerAnswer)) {
-          const q = questionById(daily.questionId);
-          history.unshift({
-            date: daily.date,
-            questionId: daily.questionId,
-            topic: q.topic,
-            text: q.text,
-            myAnswer: daily.myAnswer,
-            myAt: daily.myAt,
-            partnerAnswer: daily.partnerAnswer,
-            partnerAt: daily.partnerAt,
-          });
-        }
+        if ((daily.date && daily.questionId && daily.questionId !== "real") || daily.myAnswer) return;
+        const today = pairDayKey(new Date());
         const next = pickQuestion(today, daily.skippedIds ?? []);
         set({
           daily: {
+            ...daily,
             date: today,
             questionId: next.id,
             skippedIds: daily.skippedIds ?? [],
-            history,
-          },
-        });
-      },
-      answerDaily: (text, who = "me") => {
-        const value = text.trim();
-        if (!value) return;
-        get().ensureDaily();
-        const daily = get().daily;
-        if (who === "me" && daily.myAnswer) return;
-        if (who === "partner" && daily.partnerAnswer) return;
-        set({
-          daily:
-            who === "partner"
-              ? { ...daily, partnerAnswer: value, partnerAt: new Date().toISOString() }
-              : { ...daily, myAnswer: value, myAt: new Date().toISOString() },
-        });
-      },
-      skipDaily: () => {
-        get().ensureDaily();
-        const daily = get().daily;
-        const today = daily.date;
-        const skippedIds = [...new Set([...(daily.skippedIds ?? []), daily.questionId])];
-        const next = pickQuestion(today, skippedIds);
-        set({
-          daily: {
-            date: today,
-            questionId: next.id,
-            skippedIds,
             history: daily.history ?? [],
           },
         });
       },
+      answerDaily: (text) => {
+        const value = text.trim();
+        if (!value) return;
+        get().ensureDaily();
+        const daily = get().daily;
+        if (daily.myAnswer) return;
+        set({
+          daily: { ...daily, myAnswer: value, myAt: new Date().toISOString() },
+        });
+      },
+      setDaily: (daily) => set({ daily }),
       addCard: (input) =>
         set({ cards: [{ id: crypto.randomUUID(), ...input }, ...get().cards] }),
       updateCard: (id, input) =>
