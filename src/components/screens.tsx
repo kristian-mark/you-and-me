@@ -36,6 +36,7 @@ import {
   Vote,
   Wallet,
 } from "lucide-react";
+import { AlbumScreen } from "@/components/album-screen";
 import { NewListSheet } from "@/components/new-list-sheet";
 import { NotesScreen } from "@/components/notes-screen";
 import { GiftRadarScreen } from "@/components/gift-radar-screen";
@@ -1562,6 +1563,10 @@ export function MoreScreen() {
     partnerRemindedAt: quiz.partnerRemindedAt,
     partnerName,
   });
+
+  if (moreOpen === "album") {
+    return <AlbumScreen onBack={() => setMore(null)} />;
+  }
 
   if (moreOpen === "notes") {
     return <NotesScreen onBack={() => setMore(null)} />;
