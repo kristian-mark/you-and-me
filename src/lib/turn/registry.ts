@@ -3,6 +3,7 @@ import { checkersRules } from "./checkers.ts";
 import { dotsRules } from "./dots.ts";
 import { reversiRules } from "./reversi.ts";
 import { tttRules } from "./ttt.ts";
+import { durakRules } from "./durak.ts";
 import { seaRules } from "./sea.ts";
 
 // One rules module per game type. Each game is its own app_games row
@@ -14,6 +15,7 @@ export const turnGames = {
   reversi: reversiRules,
   checkers: checkersRules,
   sea: seaRules,
+  durak: durakRules,
 } as const;
 
 export type TurnGameType = keyof typeof turnGames;

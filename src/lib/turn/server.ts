@@ -32,6 +32,17 @@ import {
   type DotsState,
 } from "./dots.ts";
 import {
+  beginDurak,
+  idleDurakView,
+  newDurakMatch,
+  presentDurak,
+  readDurakState,
+  reopenDurak,
+  type DurakMatchView,
+  type DurakMove,
+  type DurakState,
+} from "./durak.ts";
+import {
   beginCheckers,
   idleCheckersView,
   newCheckersMatch,
@@ -193,6 +204,8 @@ type MatchKit<TState, TView> = {
   /** When the client version is stale, replay this move on the latest row. Null keeps the strict conflict. */
   rebase?: (snapshot: TurnSnapshot<TState>, seat: Seat, move: unknown) => TurnStep<TState> | null;
   repair?: (snapshot: TurnSnapshot<TState>) => TurnStep<TState> | null;
+  /** «Новая игра» raced with the partner. Join their deal instead of failing the version check. */
+  reopen?: (snapshot: TurnSnapshot<TState>) => "join" | "begin";
 };
 
 function createMatch<TState, TView>(kit: MatchKit<TState, TView>) {
@@ -260,35 +273,48 @@ function createMatch<TState, TView>(kit: MatchKit<TState, TView>) {
 
   async function open(userId: string, version: number): Promise<TView> {
     const { pair, pairId, seat } = await requirePair(userId);
-    const row = await loadRow(pairId, kit.game);
-    const now = new Date().toISOString();
-    if (!row) {
-      if (version !== 0) throw new TurnConflictError();
-      const step = kit.begin(kit.empty(), seat);
-      try {
-        await sbInsert("app_games", {
-          pair_id: pairId,
-          game_type: kit.game,
-          created_at: now,
-          ...fields(pair, step, 1, now),
-        });
-      } catch (error) {
-        if (error instanceof Error && error.name === "ConflictError") throw new TurnConflictError();
-        throw error;
+    let row = await loadRow(pairId, kit.game);
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const now = new Date().toISOString();
+      if (!row) {
+        if (version !== 0 && !kit.reopen) throw new TurnConflictError();
+        const step = kit.begin(kit.empty(), seat);
+        try {
+          await sbInsert("app_games", {
+            pair_id: pairId,
+            game_type: kit.game,
+            created_at: now,
+            ...fields(pair, step, 1, now),
+          });
+        } catch (error) {
+          if (!(error instanceof Error) || error.name !== "ConflictError") throw error;
+          if (!kit.reopen) throw new TurnConflictError();
+          row = await loadRow(pairId, kit.game);
+          continue;
+        }
+        return show(step, 1, seat, now);
       }
-      return show(step, 1, seat, now);
+      const current = toSnapshot(row, pair, kit.read);
+      const policy = kit.reopen
+        ? kit.reopen(current.snapshot)
+        : current.version !== version
+          ? "conflict"
+          : current.snapshot.status === "active"
+            ? "join"
+            : "begin";
+      if (policy === "conflict") throw new TurnConflictError();
+      if (policy === "join") {
+        return kit.present(current.snapshot, current.version, seat, row.updated_at ?? null);
+      }
+      const previous = current.snapshot.status === "finished" ? kit.reset(current.snapshot.state) : current.snapshot.state;
+      const step = kit.begin(previous, seat);
+      const guard = current.snapshot.status === "finished" ? "status=eq.finished" : "status=eq.idle&turn_user_id=is.null";
+      const saved = await compareAndSwap(pairId, kit.game, current.version, guard, fields(pair, step, current.version + 1, now));
+      if (saved) return show(step, current.version + 1, seat, saved.updated_at ?? now);
+      if (!kit.reopen) throw new TurnConflictError();
+      row = await loadRow(pairId, kit.game);
     }
-    const current = toSnapshot(row, pair, kit.read);
-    if (current.version !== version) throw new TurnConflictError();
-    if (current.snapshot.status === "active") {
-      return kit.present(current.snapshot, current.version, seat, row.updated_at ?? null);
-    }
-    const previous = current.snapshot.status === "finished" ? kit.reset(current.snapshot.state) : current.snapshot.state;
-    const step = kit.begin(previous, seat);
-    const guard = current.snapshot.status === "finished" ? "status=eq.finished" : "status=eq.idle&turn_user_id=is.null";
-    const saved = await compareAndSwap(pairId, kit.game, current.version, guard, fields(pair, step, current.version + 1, now));
-    if (!saved) throw new TurnConflictError();
-    return show(step, current.version + 1, seat, saved.updated_at ?? now);
+    throw new TurnConflictError();
   }
 
   return { load, play, open };
@@ -361,6 +387,18 @@ const seaMatch = createMatch<SeaState, SeaMatchView>({
   mayAct: seaMayAct,
   rebase: rebaseSeaSetup,
   apply: (snapshot, seat, move) => turnGames.sea.apply(snapshot, seat, move as SeaMove),
+});
+
+const durakMatch = createMatch<DurakState, DurakMatchView>({
+  game: turnGames.durak.type,
+  empty: () => turnGames.durak.empty(),
+  read: readDurakState,
+  begin: beginDurak,
+  reset: newDurakMatch,
+  present: presentDurak,
+  idle: idleDurakView,
+  reopen: reopenDurak,
+  apply: (snapshot, seat, move) => turnGames.durak.apply(snapshot, seat, move as DurakMove),
 });
 
 function parseVersion(value: unknown) {
@@ -620,6 +658,51 @@ export const openNewSeaMatch = createServerFn({ method: "POST" })
   .handler(async ({ context, data }): Promise<SeaMatchView> => {
     try {
       return await seaMatch.open(context.userId, data.version);
+    } catch (error) {
+      textOf(error);
+    }
+  });
+
+export const loadDurakMatch = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }): Promise<DurakMatchView> => {
+    try {
+      return await durakMatch.load(context.userId);
+    } catch (error) {
+      textOf(error);
+    }
+  });
+
+export const playDurakMove = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: unknown) => {
+    if (!input || typeof input !== "object") throw new Error("Некорректный ход");
+    const raw = input as { kind?: unknown; index?: unknown; version?: unknown };
+    const version = parseVersion(raw.version);
+    if (raw.kind === "bito" || raw.kind === "take" || raw.kind === "finish") return { kind: raw.kind, version };
+    if (raw.kind === "play" && typeof raw.index === "number" && Number.isInteger(raw.index) && raw.index >= 0 && raw.index < 40) {
+      return { kind: "play" as const, index: raw.index, version };
+    }
+    throw new Error("Некорректный ход");
+  })
+  .handler(async ({ context, data }): Promise<DurakMatchView> => {
+    try {
+      const move = data.kind === "play" ? { kind: data.kind, index: data.index } : { kind: data.kind };
+      return await durakMatch.play(context.userId, move, data.version);
+    } catch (error) {
+      textOf(error);
+    }
+  });
+
+export const openNewDurakMatch = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: unknown) => {
+    if (!input || typeof input !== "object") throw new Error("Некорректная партия");
+    return { version: parseVersion((input as { version?: unknown }).version) };
+  })
+  .handler(async ({ context, data }): Promise<DurakMatchView> => {
+    try {
+      return await durakMatch.open(context.userId, data.version);
     } catch (error) {
       textOf(error);
     }
