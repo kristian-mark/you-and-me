@@ -16,6 +16,8 @@ import {
   countUnread,
   cursorIso,
   groupByDay,
+  rowStillUnread,
+  unreadLowerBound,
   latestOwn,
   mergeThread,
   partnerReadMine,
@@ -94,6 +96,23 @@ test("unread count ignores my messages, deletions, and what I already read", () 
   assert.match(filter, /^pair_id=eq\.pair-1&author_user_id=neq\.user-a&/);
   assert.match(filter, /deleted_at=is\.null/);
   assert.throws(() => unreadFilter("pair-1", "user a", null));
+});
+
+test("a millisecond read cursor does not leave the same microsecond row unread", () => {
+  const created = "2026-11-13T10:55:30.04191+00:00";
+  const truncated = "2026-11-13T10:55:30.041Z";
+  assert.equal(rowStillUnread(created, truncated), false);
+  assert.equal(rowStillUnread("2026-11-13T10:55:30.041999+00:00", truncated), false);
+  assert.equal(rowStillUnread("2026-11-13T10:55:30.042000+00:00", truncated), true);
+  const exact = "2026-11-13T10:55:30.041910+00:00";
+  assert.equal(rowStillUnread(created, exact), false);
+  assert.equal(rowStillUnread("2026-11-13T10:55:30.041920+00:00", exact), true);
+  const legacy = decodeURIComponent(unreadFilter("pair-1", "user-a", truncated));
+  assert.match(legacy, /created_at=gte\.2026-11-13T10:55:30\.042000\+00:00/);
+  const fresh = decodeURIComponent(unreadFilter("pair-1", "user-a", exact));
+  assert.match(fresh, /created_at=gt\.2026-11-13T10:55:30\.041910\+00:00/);
+  assert.equal(unreadLowerBound(created).op, "gt");
+  assert.throws(() => unreadFilter("pair-1", "user-a", "10:55:30.04191 or true"));
 });
 
 test("read receipt follows the partner cursor, and deletes do not come back", () => {

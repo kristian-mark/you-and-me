@@ -19,8 +19,8 @@ import {
   chatObjectPath,
   chatPathBelongs,
   clampDuration,
-  clampReadAt,
   idsInPairFilter,
+  readCursor,
   isLocalCard,
   parseCardKind,
   parseChatKind,
@@ -109,7 +109,7 @@ async function readMap(pairId: string) {
     "app_chat_reads",
     `${eqFilter("pair_id", assertChatId(pairId))}&select=user_id,read_at`,
   );
-  return new Map(rows.map((row) => [row.user_id, iso(row.read_at)]));
+  return new Map(rows.map((row) => [row.user_id, readCursor(row.read_at).stamp]));
 }
 
 function cardIds(rows: MessageRow[], kind: ChatCardKind) {
@@ -390,9 +390,17 @@ export async function deleteOwn(userId: string, messageId: string) {
   return id;
 }
 
-export async function markRead(userId: string, at: string) {
+export async function markRead(userId: string, messageId: string) {
   const access = await gate(userId);
-  const readAt = clampReadAt(at);
+  const id = assertChatId(messageId);
+  const row = (
+    await sbSelect<{ id: string; pair_id: string; created_at: string }>(
+      "app_chat_messages",
+      `${eqFilter("pair_id", access.pairId)}&${eqFilter("id", id)}&select=id,pair_id,created_at`,
+    )
+  )[0];
+  if (!row || row.pair_id !== access.pairId || !row.created_at) return null;
+  const readAt = readCursor(row.created_at).stamp;
   await sbUpsert(
     "app_chat_reads",
     { pair_id: access.pairId, user_id: userId, read_at: readAt },

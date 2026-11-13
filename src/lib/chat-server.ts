@@ -100,7 +100,7 @@ export const deleteChatMessage = createServerFn({ method: "POST" })
 
 export const markChatRead = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator((at: string) => at)
+  .validator((id: string) => assertChatId(id))
   .handler(async ({ context, data }) => {
     try {
       return await markRead(context.userId, data);

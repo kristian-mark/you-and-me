@@ -741,7 +741,7 @@ export function CalendarScreen() {
   }
 
   return (
-    <section className="flex min-h-0 w-full min-w-0 flex-1 flex-col px-5 pb-28">
+    <section className="flex min-h-0 w-full min-w-0 flex-1 flex-col px-5 pb-[calc(12.5rem+env(safe-area-inset-bottom))]">
       <p className="min-w-0 pt-5 text-[13px] text-muted uppercase">
         {formatRuWeekday(new Date())}
       </p>
@@ -869,6 +869,14 @@ export function CalendarScreen() {
               <li key={item.id} className="flex items-stretch gap-2">
                 <button
                   type="button"
+                  aria-label="В чат"
+                  onClick={() => void shareCalendarItem(item)}
+                  className="grid w-11 shrink-0 place-items-center self-center rounded-2xl bg-raised"
+                >
+                  <MessageCircle className="size-4" />
+                </button>
+                <button
+                  type="button"
                   onClick={open}
                   className={`min-w-0 flex-1 text-left ${
                     active && done
@@ -887,14 +895,6 @@ export function CalendarScreen() {
                     </p>
                     <p className="truncate text-[16px]">{item.title}</p>
                   </div>
-                </button>
-                <button
-                  type="button"
-                  aria-label="В чат"
-                  onClick={() => void shareCalendarItem(item)}
-                  className="grid w-11 shrink-0 place-items-center rounded-2xl bg-raised"
-                >
-                  <MessageCircle className="size-4" />
                 </button>
               </li>
             );

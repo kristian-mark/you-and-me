@@ -183,6 +183,59 @@ export function clampReadAt(value: string, now = Date.now()) {
   return new Date(Math.min(time, now)).toISOString();
 }
 
+const STAMP = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(\.\d{1,6})?(Z|[+-]\d{2}:\d{2}|[+-]\d{2})$/;
+
+/**
+ * Postgres `timestamptz` keeps microseconds. `Date` keeps milliseconds, so a
+ * cursor of `10:55:30.041` is still less than a row at `10:55:30.04191`.
+ * The normalized stamp is always 6 fractional digits and `+00:00`.
+ */
+export function readCursor(value: string) {
+  const match = value.trim().match(STAMP);
+  if (!match) throw new Error("Некорректный курсор");
+  const fraction = (match[3] ?? "").slice(1);
+  const rawOffset = match[4] ?? "Z";
+  const offset =
+    rawOffset === "Z" ? 0 : offsetMinutes(rawOffset.startsWith("-") ? -1 : 1, rawOffset.slice(1));
+  const [year, month, day] = match[1].split("-").map(Number);
+  const [hour, minute, second] = match[2].split(":").map(Number);
+  const utcMs = Date.UTC(year, month - 1, day, hour, minute, second) - offset * 60_000;
+  if (!Number.isFinite(utcMs)) throw new Error("Некорректный курсор");
+  const micros = BigInt(utcMs) * 1000n + BigInt(fraction.padEnd(6, "0"));
+  return { micros, fractionDigits: fraction.length, stamp: stampFromMicros(micros) };
+}
+
+function offsetMinutes(sign: number, body: string) {
+  const [hour, minute] = body.includes(":") ? body.split(":") : [body, "0"];
+  return sign * (Number(hour) * 60 + Number(minute));
+}
+
+function stampFromMicros(micros: bigint) {
+  const ms = micros / 1000n;
+  const fraction = (micros % 1000_000n).toString().padStart(6, "0");
+  const date = new Date(Number(ms));
+  if (Number.isNaN(date.getTime())) throw new Error("Некорректный курсор");
+  return `${date.toISOString().slice(0, 19)}.${fraction}+00:00`;
+}
+
+/**
+ * A cursor that only has millisecond precision covers the whole millisecond:
+ * the row that produced it still has microseconds above that instant.
+ * A microsecond cursor from the database is exact, so only a later row counts.
+ */
+export function unreadLowerBound(readAt: string) {
+  const cursor = readCursor(readAt);
+  if (cursor.fractionDigits > 3) return { op: "gt" as const, stamp: cursor.stamp };
+  return { op: "gte" as const, stamp: stampFromMicros(cursor.micros + 1000n) };
+}
+
+export function rowStillUnread(createdAt: string, readAt: string) {
+  const created = readCursor(createdAt).micros;
+  const bound = unreadLowerBound(readAt);
+  const edge = readCursor(bound.stamp).micros;
+  return bound.op === "gt" ? created > edge : created >= edge;
+}
+
 export function clampPage(value: number) {
   if (!Number.isFinite(value)) return CHAT_PAGE;
   return Math.max(1, Math.min(80, Math.floor(value)));
@@ -224,7 +277,8 @@ export function threadFilter(pairId: string, query: ThreadQuery) {
 export function unreadFilter(pairId: string, myUserId: string, readAt: string | null) {
   const pair = pairEq(pairId);
   const author = `author_user_id=neq.${encodeURIComponent(assertChatId(myUserId))}`;
-  const since = readAt ? `&created_at=gt.${encodeURIComponent(cursorIso(readAt))}` : "";
+  const bound = readAt ? unreadLowerBound(readAt) : null;
+  const since = bound ? `&created_at=${bound.op}.${encodeURIComponent(bound.stamp)}` : "";
   return `${pair}&${author}&deleted_at=is.null${since}&select=id&order=created_at.asc&limit=100`;
 }
 

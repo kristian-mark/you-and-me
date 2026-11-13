@@ -102,6 +102,7 @@ export function ChatScreen({ onBack }: { onBack: () => void }) {
   const stopRef = useRef<(send: boolean) => void>(() => undefined);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   itemsRef.current = items;
 
   useEffect(() => {
@@ -128,15 +129,18 @@ export function ChatScreen({ onBack }: { onBack: () => void }) {
   async function pull() {
     const after = itemsRef.current.at(-1)?.createdAt ?? null;
     const sync = await syncChat({ data: { after } });
-    const stamps = [after, ...sync.messages.map((item) => item.createdAt)].filter((value): value is string => Boolean(value));
-    const newest = stamps.sort().at(-1) ?? null;
+    const newest = [...itemsRef.current, ...sync.messages].reduce<ChatDto | null>((best, item) => {
+      if (item.deletedAt) return best;
+      if (!best || item.createdAt > best.createdAt || (item.createdAt === best.createdAt && item.id > best.id)) return item;
+      return best;
+    }, null);
     setItems((current) => mergeThread(current, sync.messages, sync.deletedIds));
     setPartnerReadAt(sync.partnerReadAt);
     if (!after) setHasOlder(sync.hasOlder);
-    if (newest && marked.current !== newest && (!sync.myReadAt || Date.parse(sync.myReadAt) < Date.parse(newest))) {
-      marked.current = newest;
+    if (newest && marked.current !== newest.id) {
+      marked.current = newest.id;
       try {
-        await markChatRead({ data: newest });
+        await markChatRead({ data: newest.id });
       } catch {
         marked.current = "";
       }
@@ -192,17 +196,25 @@ export function ChatScreen({ onBack }: { onBack: () => void }) {
     }
   }
 
+  function collapseComposer() {
+    const node = composerRef.current;
+    if (!node) return;
+    node.value = "";
+    node.style.height = "auto";
+  }
+
   async function sendText() {
     const draft = text.trim();
     if (!draft || busy) return;
     setText("");
+    collapseComposer();
     setBusy(true);
     stick.current = true;
     try {
       const saved = await sendChatText({ data: { text: draft } });
       setItems((current) => mergeThread(current, [saved], []));
-      marked.current = saved.createdAt;
-      void markChatRead({ data: saved.createdAt }).catch(() => undefined);
+      marked.current = saved.id;
+      void markChatRead({ data: saved.id }).catch(() => undefined);
     } catch (error) {
       setText((current) => current || draft);
       setBanner(error instanceof Error ? error.message : "Не ушло");
@@ -459,6 +471,7 @@ export function ChatScreen({ onBack }: { onBack: () => void }) {
               <Plus className="size-5" />
             </button>
             <textarea
+              ref={composerRef}
               rows={1}
               value={text}
               placeholder="Сообщение"
