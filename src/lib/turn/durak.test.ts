@@ -1,16 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  DURAK_CARD_MIN_STEP,
+  DURAK_CARD_W,
   beats,
   beginDurak,
   dealDurak,
   durakRules,
   freshDeck,
+  handFanStep,
   presentDurak,
+  reopenDurak,
   type Card,
   type DurakState,
 } from "./durak.ts";
-import type { TurnSnapshot } from "./engine.ts";
+import { TurnRuleError, type TurnSnapshot } from "./engine.ts";
 
 const six: Card = { suit: "h", rank: 6 };
 const seven: Card = { suit: "h", rank: 7 };
@@ -159,4 +163,56 @@ test("the other hand and the deck order never leave the server", () => {
   assert.equal(view.partnerCards, 6);
   assert.equal(JSON.stringify(view).includes(JSON.stringify(started.state.deck)), false);
   assert.equal(JSON.stringify(view).includes(JSON.stringify(started.state.handB)), false);
+});
+
+test("a second new game joins the deal the partner just opened", () => {
+  const started = beginDurak(durakRules.empty(), "a");
+  const finished: TurnSnapshot<DurakState> = {
+    state: { ...started.state, wins: { a: 1, b: 0 } },
+    status: "finished",
+    turn: null,
+    winner: "a",
+  };
+  assert.equal(reopenDurak(finished), "begin");
+  const fresh: TurnSnapshot<DurakState> = {
+    state: started.state,
+    status: "active",
+    turn: started.turn,
+    winner: null,
+  };
+  assert.equal(reopenDurak(fresh), "join");
+  assert.equal(fresh.state.handA, started.state.handA);
+  assert.equal(fresh.state.handB, started.state.handB);
+});
+
+test("бито on the defender's turn names the rule", () => {
+  const state: DurakState = {
+    ...durakRules.empty(),
+    handA: [six],
+    handB: [seven],
+    table: [{ attack: other }],
+    attacker: "a",
+    defender: "b",
+    phase: "defend",
+  };
+  assert.throws(() => play(state, "b", { kind: "bito" }), (error: unknown) => {
+    assert.ok(error instanceof TurnRuleError);
+    assert.equal(error.code, "illegal");
+    assert.match(error.message, /Бито/);
+    assert.equal(error.message.includes("ход партнёра"), false);
+    return true;
+  });
+});
+
+test("six and eight cards fit a 240px tray, and a very large hand scrolls", () => {
+  const tray = 240;
+  for (const count of [6, 8]) {
+    const step = handFanStep(tray, count);
+    const width = DURAK_CARD_W + (count - 1) * step;
+    assert.ok(width <= tray + 0.01, `${count} cards span ${width}`);
+    assert.ok(step >= DURAK_CARD_MIN_STEP);
+  }
+  const crowded = handFanStep(tray, 20);
+  assert.equal(crowded, DURAK_CARD_MIN_STEP);
+  assert.ok(DURAK_CARD_W + 19 * crowded > tray);
 });

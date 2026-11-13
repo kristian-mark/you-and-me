@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { CircleHelp, Layers, MousePointerClick, Plus, Trophy, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, CircleHelp, Layers, MousePointerClick, Plus, Trophy, X } from "lucide-react";
 import { useCouple, usePlayerColors } from "@/lib/couple-store";
 import { pieceBg } from "@/lib/pair-color";
 import { ScoreLine } from "@/components/score-line";
 import { GAME_POLL_MS, pollFailureNotice, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
-import { durakBanner, type Card, type DurakMatchView, type Suit } from "@/lib/turn/durak";
+import { DURAK_CARD_W, durakBanner, handFanStep, type Card, type DurakMatchView, type Suit } from "@/lib/turn/durak";
 import { loadDurakMatch, openNewDurakMatch, playDurakMove } from "@/lib/turn/server";
 import { isConnectionFailure, userMessage } from "@/lib/user-message";
 
@@ -30,7 +30,7 @@ function red(card: Card) {
 }
 
 function Face({ card, selected, onClick }: { card: Card; selected?: boolean; onClick?: () => void }) {
-  const className = `relative shrink-0 rounded-xl bg-cream text-left ${selected ? "-translate-y-2 ring-2 ring-blue" : ""}`;
+  const className = `relative shrink-0 rounded-xl bg-cream text-left ${selected ? "-translate-y-3 ring-2 ring-blue shadow-[0_10px_18px_rgba(0,0,0,0.45)]" : ""}`;
   const mark = (
     <span className={`absolute top-1 left-1.5 text-[15px] leading-none font-semibold ${red(card) ? "text-[#c43758]" : "text-[#161616]"}`}>
       {label(card)}
@@ -38,13 +38,13 @@ function Face({ card, selected, onClick }: { card: Card; selected?: boolean; onC
   );
   if (!onClick) {
     return (
-      <div style={{ width: 64, height: 90 }} className={className}>
+      <div style={{ width: DURAK_CARD_W, height: 90 }} className={className}>
         {mark}
       </div>
     );
   }
   return (
-    <button type="button" onClick={onClick} aria-label={label(card)} style={{ width: 64, height: 90 }} className={className}>
+    <button type="button" onClick={onClick} aria-label={label(card)} style={{ width: DURAK_CARD_W, height: 90 }} className={className}>
       {mark}
     </button>
   );
@@ -72,6 +72,84 @@ function DurakArt() {
           <span className="absolute top-1 left-1 text-[12px] font-semibold text-[#161616]">Т♠</span>
         </span>
       </div>
+    </div>
+  );
+}
+
+function HandFan({
+  cards,
+  picked,
+  myTurn,
+  onPick,
+}: {
+  cards: Card[];
+  picked: number | null;
+  myTurn: boolean;
+  onPick: (index: number) => void;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const [available, setAvailable] = useState(0);
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const step = handFanStep(available > 0 ? available - 1 : 240, cards.length);
+  const scrolls = available > 0 && DURAK_CARD_W + Math.max(0, cards.length - 1) * step > available + 0.5;
+
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const measure = () => {
+      setAvailable(el.clientWidth);
+      setEdges({
+        left: el.scrollLeft > 2,
+        right: el.scrollLeft + el.clientWidth < el.scrollWidth - 2,
+      });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    el.addEventListener("scroll", measure, { passive: true });
+    return () => {
+      observer.disconnect();
+      el.removeEventListener("scroll", measure);
+    };
+  }, [cards.length, step]);
+
+  const nudge = (direction: number) => box.current?.scrollBy({ left: direction * 72, behavior: "smooth" });
+
+  return (
+    <div className="relative mt-4 min-w-0">
+      <div ref={box} data-hand-tray className="w-full min-w-0 overflow-x-auto pt-4 pb-1">
+        <div className="flex w-max items-end">
+          {cards.map((card, index) => (
+            <div
+              key={`${card.suit}${card.rank}-${index}`}
+              className="relative"
+              style={{ marginLeft: index ? step - DURAK_CARD_W : 0, zIndex: picked === index ? 40 : index + 1 }}
+            >
+              <Face card={card} selected={picked === index} onClick={myTurn ? () => onPick(index) : undefined} />
+            </div>
+          ))}
+        </div>
+      </div>
+      {scrolls && edges.left ? (
+        <button
+          type="button"
+          aria-label="Карты левее"
+          onClick={() => nudge(-1)}
+          className="absolute top-4 left-0 grid h-[90px] w-9 place-items-center bg-gradient-to-r from-bg via-bg/80 to-transparent text-cream"
+        >
+          <ChevronLeft className="size-5" />
+        </button>
+      ) : null}
+      {scrolls && edges.right ? (
+        <button
+          type="button"
+          aria-label="Карты правее"
+          onClick={() => nudge(1)}
+          className="absolute top-4 right-0 grid h-[90px] w-9 place-items-center bg-gradient-to-l from-bg via-bg/80 to-transparent text-cream"
+        >
+          <ChevronRight className="size-5" />
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -197,7 +275,7 @@ export function DurakMatch({ onBack }: { onBack: () => void; onAgain?: () => voi
 
   return (
     <section className="fixed inset-0 z-30 flex flex-col overflow-hidden bg-bg" data-status={view?.status ?? "loading"}>
-      <div className="app-frame safe-pad flex min-h-0 w-full flex-1 flex-col overflow-y-auto px-5 pb-6">
+      <div className="app-frame safe-pad flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-5 pb-6">
         <header className="grid shrink-0 grid-cols-[auto_1fr_auto] items-center gap-2 pt-2">
           <button type="button" onClick={onBack} className="inline-flex min-h-11 items-center pr-2 text-[17px] text-[#e6e1d6]">
             ‹ Игры
@@ -222,7 +300,7 @@ export function DurakMatch({ onBack }: { onBack: () => void; onAgain?: () => voi
         ) : (
           <>
             {live ? (
-              <div className={`mt-2 ${pending ? "opacity-70" : ""}`}>
+              <div className={`mt-2 min-w-0 ${pending ? "opacity-70" : ""}`}>
                 <div className="flex items-center gap-3">
                   {view.trumpCard ? (
                     <Face card={view.trumpCard} />
@@ -239,7 +317,7 @@ export function DurakMatch({ onBack }: { onBack: () => void; onAgain?: () => voi
                 </div>
                 <div className="mt-4">
                   <p className="text-[13px] text-muted">У {partnerName} · {view.partnerCards}</p>
-                  <div className="mt-2 flex overflow-x-auto">
+                  <div className="mt-2 flex min-w-0 overflow-x-auto">
                     {Array.from({ length: view.partnerCards }, (_, index) => (
                       <span key={index} style={{ marginLeft: index ? -10 : 0 }} className="relative">
                         <Back />
@@ -267,19 +345,12 @@ export function DurakMatch({ onBack }: { onBack: () => void; onAgain?: () => voi
                     <p className="py-8 text-center text-[15px] text-muted">Стол пуст</p>
                   )}
                 </div>
-                <div className="mt-4 overflow-x-auto pb-3">
-                  <div className="flex w-max items-end pr-3">
-                    {view.hand.map((card, index) => (
-                      <div key={`${card.suit}${card.rank}-${index}`} className="relative" style={{ marginLeft: index ? -22 : 0, zIndex: picked === index ? 40 : index + 1 }}>
-                        <Face
-                          card={card}
-                          selected={picked === index}
-                          onClick={view.myTurn ? () => (picked === index ? send({ kind: "play", index }) : setPicked(index)) : undefined}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <HandFan
+                  cards={view.hand}
+                  picked={picked}
+                  myTurn={view.myTurn}
+                  onPick={(index) => (picked === index ? send({ kind: "play", index }) : setPicked(index))}
+                />
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   {view.canBito ? (
                     <button type="button" disabled={pending} onClick={() => send({ kind: "bito" })} className="min-h-14 rounded-full bg-cream text-[16px] font-semibold text-cream-fg disabled:opacity-60">

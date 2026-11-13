@@ -37,6 +37,7 @@ import {
   newDurakMatch,
   presentDurak,
   readDurakState,
+  reopenDurak,
   type DurakMatchView,
   type DurakMove,
   type DurakState,
@@ -203,6 +204,8 @@ type MatchKit<TState, TView> = {
   /** When the client version is stale, replay this move on the latest row. Null keeps the strict conflict. */
   rebase?: (snapshot: TurnSnapshot<TState>, seat: Seat, move: unknown) => TurnStep<TState> | null;
   repair?: (snapshot: TurnSnapshot<TState>) => TurnStep<TState> | null;
+  /** «Новая игра» raced with the partner. Join their deal instead of failing the version check. */
+  reopen?: (snapshot: TurnSnapshot<TState>) => "join" | "begin";
 };
 
 function createMatch<TState, TView>(kit: MatchKit<TState, TView>) {
@@ -270,35 +273,48 @@ function createMatch<TState, TView>(kit: MatchKit<TState, TView>) {
 
   async function open(userId: string, version: number): Promise<TView> {
     const { pair, pairId, seat } = await requirePair(userId);
-    const row = await loadRow(pairId, kit.game);
-    const now = new Date().toISOString();
-    if (!row) {
-      if (version !== 0) throw new TurnConflictError();
-      const step = kit.begin(kit.empty(), seat);
-      try {
-        await sbInsert("app_games", {
-          pair_id: pairId,
-          game_type: kit.game,
-          created_at: now,
-          ...fields(pair, step, 1, now),
-        });
-      } catch (error) {
-        if (error instanceof Error && error.name === "ConflictError") throw new TurnConflictError();
-        throw error;
+    let row = await loadRow(pairId, kit.game);
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const now = new Date().toISOString();
+      if (!row) {
+        if (version !== 0 && !kit.reopen) throw new TurnConflictError();
+        const step = kit.begin(kit.empty(), seat);
+        try {
+          await sbInsert("app_games", {
+            pair_id: pairId,
+            game_type: kit.game,
+            created_at: now,
+            ...fields(pair, step, 1, now),
+          });
+        } catch (error) {
+          if (!(error instanceof Error) || error.name !== "ConflictError") throw error;
+          if (!kit.reopen) throw new TurnConflictError();
+          row = await loadRow(pairId, kit.game);
+          continue;
+        }
+        return show(step, 1, seat, now);
       }
-      return show(step, 1, seat, now);
+      const current = toSnapshot(row, pair, kit.read);
+      const policy = kit.reopen
+        ? kit.reopen(current.snapshot)
+        : current.version !== version
+          ? "conflict"
+          : current.snapshot.status === "active"
+            ? "join"
+            : "begin";
+      if (policy === "conflict") throw new TurnConflictError();
+      if (policy === "join") {
+        return kit.present(current.snapshot, current.version, seat, row.updated_at ?? null);
+      }
+      const previous = current.snapshot.status === "finished" ? kit.reset(current.snapshot.state) : current.snapshot.state;
+      const step = kit.begin(previous, seat);
+      const guard = current.snapshot.status === "finished" ? "status=eq.finished" : "status=eq.idle&turn_user_id=is.null";
+      const saved = await compareAndSwap(pairId, kit.game, current.version, guard, fields(pair, step, current.version + 1, now));
+      if (saved) return show(step, current.version + 1, seat, saved.updated_at ?? now);
+      if (!kit.reopen) throw new TurnConflictError();
+      row = await loadRow(pairId, kit.game);
     }
-    const current = toSnapshot(row, pair, kit.read);
-    if (current.version !== version) throw new TurnConflictError();
-    if (current.snapshot.status === "active") {
-      return kit.present(current.snapshot, current.version, seat, row.updated_at ?? null);
-    }
-    const previous = current.snapshot.status === "finished" ? kit.reset(current.snapshot.state) : current.snapshot.state;
-    const step = kit.begin(previous, seat);
-    const guard = current.snapshot.status === "finished" ? "status=eq.finished" : "status=eq.idle&turn_user_id=is.null";
-    const saved = await compareAndSwap(pairId, kit.game, current.version, guard, fields(pair, step, current.version + 1, now));
-    if (!saved) throw new TurnConflictError();
-    return show(step, current.version + 1, seat, saved.updated_at ?? now);
+    throw new TurnConflictError();
   }
 
   return { load, play, open };
@@ -381,6 +397,7 @@ const durakMatch = createMatch<DurakState, DurakMatchView>({
   reset: newDurakMatch,
   present: presentDurak,
   idle: idleDurakView,
+  reopen: reopenDurak,
   apply: (snapshot, seat, move) => turnGames.durak.apply(snapshot, seat, move as DurakMove),
 });
 

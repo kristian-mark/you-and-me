@@ -288,6 +288,27 @@ export function beginDurak(previous: DurakState, seat: Seat): TurnStep<DurakStat
   };
 }
 
+/**
+ * «Новая игра» from both phones. An active row is the match the partner just
+ * dealt, so the second request joins it. A finished or idle row is dealt
+ * again. Card play does not use this and keeps the strict version check.
+ */
+export function reopenDurak(latest: TurnSnapshot<DurakState>): "join" | "begin" {
+  return latest.status === "active" ? "join" : "begin";
+}
+
+export const DURAK_CARD_W = 64;
+export const DURAK_CARD_MIN_STEP = 22;
+
+/** Exposed width of each card after the first. Shrinks to fit the tray; never below a tappable strip. */
+export function handFanStep(available: number, count: number, card = DURAK_CARD_W, minStep = DURAK_CARD_MIN_STEP) {
+  if (count <= 1) return card;
+  const width = Math.max(0, available);
+  if (width <= card) return minStep;
+  const fit = (width - card) / (count - 1);
+  return Math.max(minStep, Math.min(card, fit));
+}
+
 export function durakBanner(view: Pick<DurakMatchView, "status" | "myTurn" | "winner" | "phase" | "iAttack" | "table">, partnerName: string) {
   if (view.status === "idle") return { title: "Колода ещё не сдана", hint: `Сбрось карты раньше, чем ${partnerName}.` };
   if (view.status === "finished") {
@@ -360,7 +381,9 @@ export const durakRules = {
       const drawn = drawUp(given);
       return endStep({ ...drawn, phase: "attack" }, state.wins, state.draws);
     }
-    if (state.phase !== "attack" || actor !== state.attacker) throw new TurnRuleError("turn", "Сейчас ход партнёра");
+    if (actor !== state.attacker || state.phase !== "attack") {
+      throw new TurnRuleError("illegal", "«Бито» говорит атакующий, когда все карты побиты");
+    }
     if (!state.table.length || state.table.some((pair) => !pair.defend)) throw new TurnRuleError("illegal", "Ещё не всё побито");
     const discard = state.discard + state.table.reduce((sum, pair) => sum + (pair.defend ? 2 : 1), 0);
     const drawn = drawUp({ ...state, table: [], limit: 0, discard });
