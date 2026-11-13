@@ -1,5 +1,11 @@
 {
   "framework": null,
   "buildCommand": "npm run build",
-  "installCommand": "npm install --no-audit --no-fund"
+  "installCommand": "npm install --no-audit --no-fund",
+  "crons": [
+    {
+      "path": "/api/album/purge",
+      "schedule": "15 4 * * *"
+    }
+  ]
 }
