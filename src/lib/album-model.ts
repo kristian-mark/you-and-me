@@ -1,5 +1,7 @@
 /** Pure album rules: quota, dates, paths, and stripping EXIF before storage. */
 
+import { RU_MONTHS, RU_MONTHS_GENITIVE } from "./dates.ts";
+
 export const ALBUM_BUCKET = "album";
 export const DEFAULT_QUOTA_BYTES = 500 * 1024 * 1024;
 export const MAX_FULL_BYTES = 3_500_000;
@@ -7,36 +9,6 @@ export const MAX_THUMB_BYTES = 400_000;
 export const TRASH_DAYS = 30;
 export const SIGNED_URL_SECONDS = 6 * 60 * 60;
 export const URL_REFRESH_MS = 30 * 60 * 1000;
-
-const MONTHS = [
-  "январь",
-  "февраль",
-  "март",
-  "апрель",
-  "май",
-  "июнь",
-  "июль",
-  "август",
-  "сентябрь",
-  "октябрь",
-  "ноябрь",
-  "декабрь",
-];
-
-const MONTHS_GENITIVE = [
-  "января",
-  "февраля",
-  "марта",
-  "апреля",
-  "мая",
-  "июня",
-  "июля",
-  "августа",
-  "сентября",
-  "октября",
-  "ноября",
-  "декабря",
-];
 
 export type StoredMime = "image/webp" | "image/jpeg";
 
@@ -137,7 +109,7 @@ export function normalizeTakenAt(raw: string | undefined, now: Date) {
 
 function monthName(monthKey: string) {
   const month = Number(monthKey.slice(5, 7));
-  return MONTHS[month - 1] ?? monthKey;
+  return RU_MONTHS[month - 1] ?? monthKey;
 }
 
 function capital(text: string) {
@@ -147,7 +119,7 @@ function capital(text: string) {
 export function viewerStamp(takenAt: string) {
   const parts = clockParts(takenAt);
   if (!parts) return "";
-  const name = MONTHS_GENITIVE[parts.month - 1] ?? monthName(parts.monthKey);
+  const name = RU_MONTHS_GENITIVE[parts.month - 1] ?? monthName(parts.monthKey);
   const hh = String(parts.hour).padStart(2, "0");
   const mm = String(parts.minute).padStart(2, "0");
   return `${parts.day} ${name} в ${hh}:${mm}`;

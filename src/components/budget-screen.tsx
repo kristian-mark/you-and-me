@@ -1,24 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  addMonths,
-  eachDayOfInterval,
-  endOfMonth,
-  endOfWeek,
-  format,
-  isSameMonth,
-  startOfMonth,
-  startOfWeek,
-} from "date-fns";
-import { ru } from "date-fns/locale";
-import {
   Baby,
   Banknote,
   Briefcase,
   Building2,
   Bus,
   Car,
-  ChevronLeft,
-  ChevronRight,
   Coins,
   Coffee,
   Fuel,
@@ -51,9 +38,12 @@ import {
   Dumbbell,
   PartyPopper,
 } from "lucide-react";
+import { DatePicker } from "@/components/date-picker";
+import { SheetHeader } from "@/components/sheet-header";
 import { UsBadge } from "@/components/ui/shell";
 import { useCouple, usePlayerColors, type BudgetAccount, type BudgetCategory, type BudgetTx, type RecurringPayment } from "@/lib/couple-store";
-import { pieceBg } from "@/lib/pair-color";
+import { formatRuDay, formatRuWeekdayShort, toIsoDate } from "@/lib/dates";
+import { pieceBg, pieceRing } from "@/lib/pair-color";
 
 const MONTHS = [
   "Январь","Февраль","Март","Апрель","Май","Июнь",
@@ -290,15 +280,12 @@ function todayIso() {
 }
 
 function formatDay(iso: string) {
-  const d = new Date(`${iso}T12:00:00`);
-  const now = new Date();
   if (iso === todayIso()) return "сегодня";
-  return `${d.getDate()} ${MONTHS[d.getMonth()].toLowerCase().slice(0, 3)}`;
+  return formatRuDay(iso, "dayMonthShort");
 }
 
 function formatWhen(iso: string) {
-  const d = new Date(`${iso}T12:00:00`);
-  return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+  return formatRuDay(iso, "dayMonth");
 }
 
 export function BudgetScreen({ onBack }: { onBack: () => void }) {
@@ -958,15 +945,13 @@ function TxForm({
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-5 pb-28">
-      <div className="flex items-center justify-between pt-5">
-        <button type="button" onClick={onCancel} className="text-muted">
-          Отмена
-        </button>
-        <p className="text-[17px] font-semibold">{kind === "expense" ? "Расход" : "Доход"}</p>
-        <button type="button" disabled={!ready} onClick={onSave} className="text-blue disabled:text-muted">
-          Готово
-        </button>
-      </div>
+      <SheetHeader
+        flush
+        title={kind === "expense" ? "Расход" : "Доход"}
+        onCancel={onCancel}
+        onDone={onSave}
+        doneDisabled={!ready}
+      />
 
       <div className="relative mt-5 rounded-[24px] bg-raised px-4 py-5 text-center">
         <p className="text-[11px] tracking-[0.14em] text-muted uppercase">сумма</p>
@@ -997,7 +982,7 @@ function TxForm({
             <button
               type="button"
               onClick={() => onChange({ ...draft, paidBy: "me" })}
-              className={`flex min-w-0 items-center gap-2 rounded-2xl px-3 py-3 text-left ${draft.paidBy === "me" ? `ring-2 ${colors.me === "blue" ? "ring-blue" : "ring-pink"}` : "bg-[#2a2d36]"}`}
+              className={`flex min-w-0 items-center gap-2 rounded-2xl px-3 py-3 text-left ${draft.paidBy === "me" ? `ring-2 ${pieceRing(colors.me)}` : "bg-[#2a2d36]"}`}
             >
               <span className={`size-2.5 shrink-0 rounded-full ${pieceBg(colors.me)}`} />
               <span className="min-w-0 break-words text-[14px] leading-5">{myName}</span>
@@ -1005,7 +990,7 @@ function TxForm({
             <button
               type="button"
               onClick={() => onChange({ ...draft, paidBy: "partner" })}
-              className={`flex min-w-0 items-center gap-2 rounded-2xl px-3 py-3 text-left ${draft.paidBy === "partner" ? `ring-2 ${colors.partner === "blue" ? "ring-blue" : "ring-pink"}` : "bg-[#2a2d36]"}`}
+              className={`flex min-w-0 items-center gap-2 rounded-2xl px-3 py-3 text-left ${draft.paidBy === "partner" ? `ring-2 ${pieceRing(colors.partner)}` : "bg-[#2a2d36]"}`}
             >
               <span className={`size-2.5 shrink-0 rounded-full ${pieceBg(colors.partner)}`} />
               <span className="min-w-0 break-words text-[14px] leading-5">{partnerName}</span>
@@ -1088,7 +1073,9 @@ function TxForm({
       </label>
 
       {dateOpen ? (
-        <MiniDatePicker
+        <DatePicker
+          mode="any"
+          label="Когда"
           value={draft.date}
           onPick={(day) => {
             onChange({ ...draft, date: day });
@@ -1218,72 +1205,6 @@ function CatBtn({ cat, active, onClick }: { cat: BudgetCategory; active?: boolea
   );
 }
 
-function MiniDatePicker({
-  value,
-  onPick,
-  onClose,
-}: {
-  value?: string;
-  onPick: (day: string) => void;
-  onClose: () => void;
-}) {
-  const [cursor, setCursor] = useState(() => (value ? new Date(`${value}T12:00:00`) : new Date()));
-  const days = eachDayOfInterval({
-    start: startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 }),
-    end: endOfWeek(endOfMonth(cursor), { weekStartsOn: 1 }),
-  });
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={onClose}>
-      <div className="w-full rounded-t-3xl bg-raised px-5 pt-4 pb-8" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-3 flex items-center justify-between">
-          <button type="button" onClick={() => setCursor((d) => addMonths(d, -1))}>
-            <ChevronLeft className="size-5" />
-          </button>
-          <p className="text-[17px] font-semibold capitalize">{format(cursor, "LLLL yyyy", { locale: ru })}</p>
-          <button type="button" onClick={() => setCursor((d) => addMonths(d, 1))}>
-            <ChevronRight className="size-5" />
-          </button>
-        </div>
-        <div className="grid grid-cols-7 text-center text-[11px] text-muted">
-          {["ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"].map((d) => (
-            <div key={d}>{d}</div>
-          ))}
-        </div>
-        <div className="mt-2 grid grid-cols-7 gap-y-1 text-center">
-          {days.map((day) => {
-            const key = format(day, "yyyy-MM-dd");
-            const picked = key === value;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => onPick(key)}
-                className={`mx-auto grid size-9 place-items-center rounded-full text-[15px] ${
-                  picked
-                    ? "bg-blue text-white"
-                    : isSameMonth(day, cursor)
-                      ? "text-fg"
-                      : "text-muted/40"
-                }`}
-              >
-                {format(day, "d")}
-              </button>
-            );
-          })}
-        </div>
-        <button
-          type="button"
-          onClick={() => onPick(format(new Date(), "yyyy-MM-dd"))}
-          className="mt-4 w-full py-3 text-blue"
-        >
-          Сегодня
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function CategorySheet({
   cats,
   onPick,
@@ -1335,15 +1256,7 @@ function CustomCategory({
   const Icon = ICONS[value.icon] ?? Dumbbell;
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-28">
-      <div className="flex items-center justify-between pt-5">
-        <button type="button" onClick={onCancel} className="text-muted">
-          Отмена
-        </button>
-        <p className="text-[17px] font-semibold">Категория</p>
-        <button type="button" onClick={onSave} className="text-blue">
-          Готово
-        </button>
-      </div>
+      <SheetHeader flush title="Категория" onCancel={onCancel} onDone={onSave} />
       <div className="mx-auto mt-6 grid size-[72px] place-items-center rounded-[22px]" style={{ background: value.color }}>
         <Icon className="size-8" style={{ color: sliceColor("x", value.color) }} />
       </div>
@@ -2446,7 +2359,7 @@ function RecurringHub({
                     <span className="block truncate">{r.title || "Платёж"}</span>
                     <span className="text-[13px] text-muted">
                       {FREQ.find((f) => f.id === r.freq)?.label.toLowerCase()}
-                      {next ? ` · ${format(next, "d MMMM", { locale: ru })}` : ""}
+                      {next ? ` · ${formatRuDay(toIsoDate(next), "dayMonth")}` : ""}
                     </span>
                   </span>
                   <span className={r.kind === "income" ? "text-green" : ""}>
@@ -2544,20 +2457,13 @@ function RecurringForm({
 
   return (
     <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-5 pb-28">
-      <div className="flex items-center justify-between pt-5">
-        <button type="button" onClick={onCancel} className="text-muted">
-          Отмена
-        </button>
-        <p className="text-[17px] font-semibold">Платёж</p>
-        <button
-          type="button"
-          disabled={!canSave}
-          onClick={() => onSave(draft)}
-          className={canSave ? "text-blue" : "text-muted"}
-        >
-          Готово
-        </button>
-      </div>
+      <SheetHeader
+        flush
+        title="Платёж"
+        onCancel={onCancel}
+        onDone={() => onSave(draft)}
+        doneDisabled={!canSave}
+      />
 
       <div className="mt-5 grid grid-cols-2 rounded-full bg-raised p-1">
         <button
@@ -2818,7 +2724,7 @@ function RepeatPicker({
         <ul className="mt-2 space-y-2 text-[16px]">
           {upcoming.map((d, i) => (
             <li key={d.toISOString()} className={i ? "text-muted" : ""}>
-              {format(d, "EEE, d MMMM", { locale: ru }).toLowerCase()}
+              {formatRuWeekdayShort(d)}
             </li>
           ))}
         </ul>

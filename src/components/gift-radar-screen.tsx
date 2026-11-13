@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { differenceInCalendarDays, format } from "date-fns";
-import { ru } from "date-fns/locale";
+import { differenceInCalendarDays } from "date-fns";
+import { formatRuDay, toIsoDate } from "@/lib/dates";
 import { Cake, Gift } from "lucide-react";
 import { WishPhoto } from "@/components/wish-photo";
 import { useCouple, viewedWishOwner, type Wish } from "@/lib/couple-store";
@@ -84,7 +84,7 @@ export function GiftRadarScreen({ onBack }: { onBack: () => void }) {
         </p>
         <p className="mt-3 text-[15px] text-[#5c3344]">
           {hasDate && next
-            ? `${format(next, "d MMMM", { locale: ru })} · ${
+            ? `${formatRuDay(toIsoDate(next), "dayMonth")} · ${
                 list.length === 0 ? "список желаний пуст" : `${list.length} в списке`
               }`
             : "дата рождения ещё не указана"}

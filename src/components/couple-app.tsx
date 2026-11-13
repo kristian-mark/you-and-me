@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { format } from "date-fns";
-import { ru } from "date-fns/locale";
-import { BirthdayPicker } from "@/components/birthday-picker";
+import { DatePicker } from "@/components/date-picker";
+import { PairCode } from "@/components/pair-code";
 import { LoginNotice } from "@/components/login-notice";
 import {
   CalendarScreen,
@@ -16,6 +15,7 @@ import { authEnabled, signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { useCouple } from "@/lib/couple-store";
 import { compressPhotoData } from "@/lib/compress-photo";
+import { formatRuDay } from "@/lib/dates";
 import {
   DEMO_ANNIVERSARY,
   FALLBACK_MY_NAME,
@@ -185,9 +185,7 @@ function InviteScreen({
   const [code, setCode] = useState("");
   const [birthday, setBirthday] = useState(profile.birthday ?? "");
   const [pick, setPick] = useState(false);
-  const pretty = birthday
-    ? format(new Date(`${birthday}T12:00:00`), "d MMMM yyyy", { locale: ru })
-    : "Выбрать дату";
+  const pretty = birthday ? formatRuDay(birthday, "long") : "Выбрать дату";
 
   return (
     <main className="app-frame safe-pad flex min-h-dvh flex-col px-5 pt-12 pb-10">
@@ -195,8 +193,9 @@ function InviteScreen({
       <div>
         <h1 className="text-[34px] font-semibold tracking-tight">Мы</h1>
       </div>
-      <p className="mt-8 text-[12px] tracking-[0.16em] text-muted uppercase">твой код навсегда</p>
-      <p className="mt-3 text-[40px] font-semibold tracking-[0.16em] text-pink">{profile.inviteCode}</p>
+      <div className="mt-8">
+        <PairCode code={profile.inviteCode} label="Твой код навсегда" size="lg" framed={false} />
+      </div>
       <p className="mt-3 text-[15px] leading-6 text-muted">
         Партнёр входит в свой аккаунт и вводит этот код. В паре только двое.
       </p>
@@ -206,7 +205,7 @@ function InviteScreen({
         onClick={() => setPick(true)}
         className="mt-2 flex h-14 items-center justify-between rounded-[22px] bg-raised px-4 text-left"
       >
-        <span className={birthday ? "text-[17px] capitalize" : "text-[17px] text-muted"}>{pretty}</span>
+        <span className={birthday ? "text-[17px]" : "text-[17px] text-muted"}>{pretty}</span>
         <span className="text-muted">›</span>
       </button>
       <input
@@ -227,7 +226,9 @@ function InviteScreen({
       >
         Соединиться
       </button>
-      {pick ? <BirthdayPicker value={birthday} onPick={setBirthday} onClose={() => setPick(false)} /> : null}
+      {pick ? (
+        <DatePicker mode="birthday" label="День рождения" value={birthday} onPick={setBirthday} onClose={() => setPick(false)} />
+      ) : null}
     </main>
   );
 }

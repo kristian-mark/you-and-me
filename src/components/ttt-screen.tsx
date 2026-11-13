@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CircleHelp } from "lucide-react";
 import { useCouple, usePlayerColors } from "@/lib/couple-store";
-import { pieceBorder, pieceText, type PieceColor } from "@/lib/pair-color";
+import { pieceBg, pieceBorder, pieceText, type PieceColor } from "@/lib/pair-color";
 import { GAME_POLL_MS, pollFailureNotice, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 import { loadTttMatch, openNewTttMatch, playTttMove } from "@/lib/turn/server";
 import { tttBanner, type TttMatchView } from "@/lib/turn/ttt";
@@ -250,8 +250,8 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
                 partnerName={partnerName}
                 mine={view.wins.me}
                 theirs={view.wins.partner}
-                myTone={colors.me === "blue" ? "bg-blue" : "bg-pink"}
-                partnerTone={colors.partner === "blue" ? "bg-blue" : "bg-pink"}
+                myTone={pieceBg(colors.me)}
+                partnerTone={pieceBg(colors.partner)}
               />
             </div>
             {view.draws > 0 ? <p className="mt-1 shrink-0 text-center text-[13px] text-[#e6e1d6]">Ничьих: {view.draws}</p> : null}
@@ -315,7 +315,7 @@ function PlayerCard({
   return (
     <div className={`min-w-0 rounded-[18px] border-2 bg-raised px-3 py-2 ${active ? pieceBorder(tone) : "border-transparent"}`}>
       <div className="flex items-center gap-2">
-        <span className={`size-8 shrink-0 rounded-full ${tone === "blue" ? "bg-blue" : "bg-pink"}`} />
+        <span className={`size-8 shrink-0 rounded-full ${pieceBg(tone)}`} />
         <div className="min-w-0">
           <p className="truncate text-[16px] font-semibold">{name}</p>
           <p className="text-[13px] text-[#e6e1d6]">{mark}</p>

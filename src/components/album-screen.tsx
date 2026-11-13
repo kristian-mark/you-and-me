@@ -40,6 +40,7 @@ import {
   type AlbumPhoto,
   type TrashPhoto,
 } from "@/lib/album-server";
+import { SheetHeader } from "@/components/sheet-header";
 import { useCouple, usePlayerColors } from "@/lib/couple-store";
 import { pieceBg, pieceText } from "@/lib/pair-color";
 import { LIST_POLL_MS, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
@@ -509,31 +510,25 @@ export function AlbumScreen({ onBack }: { onBack: () => void }) {
     const cover = photos.find((photo) => photo.id === draft.coverId);
     body = (
       <section className="px-4 pt-4 pb-16">
-        <div className="flex items-center justify-between">
-          <button type="button" className="min-h-11 text-[17px] text-muted" onClick={goHome}>
-            Отмена
-          </button>
-          <h1 className="text-[17px] font-semibold">Новый альбом</h1>
-          <button
-            type="button"
-            className="min-h-11 text-[17px] font-semibold text-blue disabled:text-muted"
-            disabled={!draft.title.trim()}
-            onClick={() =>
-              void run(async () => {
-                await createAlbum({
-                  data: {
-                    title: draft.title,
-                    photoIds: draft.photoIds,
-                    coverPhotoId: draft.coverId,
-                  },
-                });
-                goHome();
-              })
-            }
-          >
-            Готово
-          </button>
-        </div>
+        <SheetHeader
+          flush
+          pad={false}
+          title="Новый альбом"
+          onCancel={goHome}
+          doneDisabled={!draft.title.trim()}
+          onDone={() =>
+            void run(async () => {
+              await createAlbum({
+                data: {
+                  title: draft.title,
+                  photoIds: draft.photoIds,
+                  coverPhotoId: draft.coverId,
+                },
+              });
+              goHome();
+            })
+          }
+        />
         <label className="mt-5 block rounded-2xl bg-raised px-4 py-3">
           <span className="text-[11px] tracking-[0.14em] text-muted uppercase">Название</span>
           <input
@@ -597,17 +592,12 @@ export function AlbumScreen({ onBack }: { onBack: () => void }) {
     const current = album ? album.coverPhotoId : draft.coverId;
     body = (
       <section className="px-4 pt-4 pb-10">
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            className="min-h-11 text-[17px] text-muted"
-            onClick={() => setPage(album ? "album" : "new")}
-          >
-            Отмена
-          </button>
-          <h1 className="text-[17px] font-semibold">Обложка</h1>
-          <span className="w-16" />
-        </div>
+        <SheetHeader
+          flush
+          pad={false}
+          title="Обложка"
+          onCancel={() => setPage(album ? "album" : "new")}
+        />
         <div className="mt-4 grid grid-cols-3 gap-0.5">
           {pool.map((photo) => (
             <button
@@ -731,46 +721,36 @@ export function AlbumScreen({ onBack }: { onBack: () => void }) {
   if (home && page === "library") {
     body = (
       <section className="px-4 pt-4 pb-28">
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            className="min-h-11 text-[17px] text-muted"
-            onClick={() => setPage(album ? "album" : "new")}
-          >
-            Отмена
-          </button>
-          <h1 className="text-[17px] font-semibold">Все фото</h1>
-          <button
-            type="button"
-            className="min-h-11 text-[17px] font-semibold text-blue"
-            onClick={() =>
-              void run(async () => {
-                if (album) {
-                  const have = new Set(album.photoIds);
-                  const next = new Set(libraryIds);
-                  const add = [...next].filter((id) => !have.has(id));
-                  const remove = [...have].filter((id) => !next.has(id));
-                  if (add.length || remove.length) {
-                    await editAlbumPhotos({ data: { albumId: album.id, add, remove } });
-                  }
-                  setPage("album");
-                } else {
-                  setDraft((current) => ({
-                    ...current,
-                    photoIds: libraryIds,
-                    coverId:
-                      current.coverId && libraryIds.includes(current.coverId)
-                        ? current.coverId
-                        : (libraryIds[0] ?? null),
-                  }));
-                  setPage("new");
+        <SheetHeader
+          flush
+          pad={false}
+          title="Все фото"
+          onCancel={() => setPage(album ? "album" : "new")}
+          onDone={() =>
+            void run(async () => {
+              if (album) {
+                const have = new Set(album.photoIds);
+                const next = new Set(libraryIds);
+                const add = [...next].filter((id) => !have.has(id));
+                const remove = [...have].filter((id) => !next.has(id));
+                if (add.length || remove.length) {
+                  await editAlbumPhotos({ data: { albumId: album.id, add, remove } });
                 }
-              })
-            }
-          >
-            Готово
-          </button>
-        </div>
+                setPage("album");
+              } else {
+                setDraft((current) => ({
+                  ...current,
+                  photoIds: libraryIds,
+                  coverId:
+                    current.coverId && libraryIds.includes(current.coverId)
+                      ? current.coverId
+                      : (libraryIds[0] ?? null),
+                }));
+                setPage("new");
+              }
+            })
+          }
+        />
         <div className="mt-4 grid grid-cols-3 gap-0.5">
           {photos.map((photo) => {
             const on = libraryIds.includes(photo.id);

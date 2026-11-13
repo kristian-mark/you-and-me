@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
+import { SheetHeader } from "@/components/sheet-header";
 import { UsBadge } from "@/components/ui/shell";
 import { useCouple, usePlayerColors, type CardKind, type LoyaltyCard } from "@/lib/couple-store";
 import { pieceBg } from "@/lib/pair-color";
@@ -431,22 +432,9 @@ function CardForm({
 
   return (
     <section className="flex min-h-0 flex-1 flex-col px-5 pb-28">
-      <div className="flex items-center justify-between pt-5">
-        <button type="button" onClick={onCancel} className="text-[17px] text-muted">
-          Отмена
-        </button>
-        <p className="text-[17px] font-semibold">Новая карта</p>
-        <button
-          type="button"
-          disabled={!ready}
-          onClick={onSave}
-          className="text-[17px] text-blue disabled:text-muted"
-        >
-          Готово
-        </button>
-      </div>
+      <SheetHeader flush title="Новая карта" onCancel={onCancel} onDone={onSave} doneDisabled={!ready} />
 
-      <label className="mt-8 block rounded-[22px] bg-raised px-5 py-4">
+      <label className="mt-5 block rounded-[22px] bg-raised px-5 py-4">
         <span className="text-[11px] tracking-[0.14em] text-muted uppercase">название</span>
         <input
           value={draft.title}

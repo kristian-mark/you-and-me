@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, Search } from "lucide-react";
+import { SheetHeader } from "@/components/sheet-header";
 import { compressPhotoFile } from "@/lib/compress-photo";
 import { useCouple, viewedWishOwner, type Wish, type WishPriority } from "@/lib/couple-store";
 import { packWish, savePairWish } from "@/lib/pair-wishes";
@@ -119,17 +120,12 @@ export function NewWishSheet({ wish, onClose }: { wish?: Wish; onClose: () => vo
   return (
     <div className="fixed inset-0 z-50 bg-bg">
       <div className="mx-auto flex h-full max-w-md flex-col">
-        <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 pt-5 pb-3">
-          <button type="button" onClick={onClose} className="justify-self-start text-[17px] text-muted">
-            Отмена
-          </button>
-          <h2 className="whitespace-nowrap text-center text-[17px] font-semibold">
-            {wish ? "Изменить" : "Новая хотелка"}
-          </h2>
-          <button type="button" onClick={save} className="justify-self-end text-[17px]">
-            Готово
-          </button>
-        </header>
+        <SheetHeader
+          title={wish ? "Изменить" : "Новая хотелка"}
+          onCancel={onClose}
+          onDone={save}
+          doneTone="fg"
+        />
 
         <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-8">
           <label className="block rounded-2xl bg-raised px-4 py-3">

@@ -1,22 +1,14 @@
 import { useEffect, useState } from "react";
 import { ChevronRight, Mail } from "lucide-react";
-import { format, parseISO } from "date-fns";
-import { ru } from "date-fns/locale";
 import { useCouple, usePlayerColors } from "@/lib/couple-store";
 import { questionById } from "@/lib/daily-questions";
 import { refreshCoupleDaily, skipSharedDaily } from "@/lib/daily-live";
-import { pieceBg, pieceText, type PieceColor } from "@/lib/pair-color";
+import { formatRuDay, formatRuShortStamp } from "@/lib/dates";
+import { pieceBg, pieceRingSoft, pieceText, pieceWash, type PieceColor } from "@/lib/pair-color";
 import { LIST_POLL_MS, useScreenPoll } from "@/lib/screen-poll";
 
 function stamp(iso: string | undefined) {
-  if (!iso) return "";
-  const date = parseISO(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  return format(date, "d MMM в HH:mm", { locale: ru });
-}
-
-function toneWash(color: PieceColor) {
-  return color === "blue" ? "bg-[#1a3a52] text-blue" : "bg-[#3d2433] text-pink";
+  return formatRuShortStamp(iso);
 }
 
 export function QuestionDayScreen({ onBack }: { onBack: () => void }) {
@@ -37,7 +29,7 @@ export function QuestionDayScreen({ onBack }: { onBack: () => void }) {
   if (past) return <PastList onBack={() => setPast(false)} />;
 
   const q = questionById(daily.questionId);
-  const dateLabel = daily.date ? format(parseISO(daily.date), "d MMMM", { locale: ru }) : "";
+  const dateLabel = daily.date ? formatRuDay(daily.date, "dayMonth") : "";
 
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-x-hidden px-5 pb-28">
@@ -78,7 +70,7 @@ function Compose({
 
   return (
     <>
-      <div className={`relative mt-6 rounded-[22px] bg-raised px-4 pb-4 pt-3 ring-1 ${colors.me === "blue" ? "ring-blue/70" : "ring-pink/70"}`}>
+      <div className={`relative mt-6 rounded-[22px] bg-raised px-4 pb-4 pt-3 ring-1 ${pieceRingSoft(colors.me)}`}>
         <span className={`absolute bottom-4 left-0 top-4 w-[3px] rounded-full ${pieceBg(colors.me)}`} />
         <textarea
           value={text}
@@ -106,7 +98,7 @@ function Compose({
             })
             .finally(() => setBusy(false));
         }}
-        className={`mt-4 min-h-11 w-full rounded-full py-4 text-[17px] font-semibold disabled:opacity-40 ${toneWash(colors.me)}`}
+        className={`mt-4 min-h-11 w-full rounded-full py-4 text-[17px] font-semibold disabled:opacity-40 ${pieceWash(colors.me)}`}
       >
         Отправить ответ
       </button>
@@ -262,7 +254,7 @@ function PastList({ onBack }: { onBack: () => void }) {
           {history.map((item) => (
             <li key={`${item.date}-${item.questionId}`} className="rounded-[22px] bg-raised px-5 py-4">
               <p className="text-[12px] tracking-[0.12em] text-muted uppercase">
-                {format(parseISO(item.date), "d MMMM", { locale: ru })} · {item.topic}
+                {formatRuDay(item.date, "dayMonth")} · {item.topic}
               </p>
               <p className="mt-2 text-[17px] font-medium leading-6 break-words">{item.text}</p>
               {item.myAnswer ? (

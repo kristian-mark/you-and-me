@@ -43,3 +43,20 @@ export function pieceText(color: PieceColor) {
 export function pieceBorder(color: PieceColor) {
   return color === "blue" ? "border-blue" : "border-pink";
 }
+
+export function pieceRing(color: PieceColor) {
+  return color === "blue" ? "ring-blue" : "ring-pink";
+}
+
+export function pieceRingSoft(color: PieceColor) {
+  return color === "blue" ? "ring-blue/70" : "ring-pink/70";
+}
+
+/** Tinted button fill that stays readable on either person color. */
+export function pieceWash(color: PieceColor) {
+  return color === "blue" ? "bg-[#1a3a52] text-blue" : "bg-[#3d2433] text-pink";
+}
+
+export function pieceCss(color: PieceColor) {
+  return color === "blue" ? "var(--color-blue)" : "var(--color-pink)";
+}

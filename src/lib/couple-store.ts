@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { pickQuestion } from "@/lib/daily-questions";
 import { pairDayKey } from "@/lib/daily-sync";
+import { RU_MONTHS } from "@/lib/dates";
 import { pairColors, type PieceColor } from "@/lib/pair-color";
 import {
   DEMO_ANNIVERSARY,
@@ -392,8 +393,6 @@ function code() {
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
-const MONTH_RU = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
-
 function limitAlerts(budget: BudgetState, input: Omit<BudgetTx, "id" | "createdAt">): BudgetAlert[] {
   if (input.kind !== "expense") return budget.alerts ?? [];
   const month = input.date.slice(0, 7);
@@ -403,7 +402,7 @@ function limitAlerts(budget: BudgetState, input: Omit<BudgetTx, "id" | "createdA
   const prevAll = budget.txs.filter(inMonth).reduce((s, t) => s + t.amount, 0);
   const nextAll = prevAll + input.amount;
   const list = [...(budget.alerts ?? [])];
-  const monthName = MONTH_RU[Number(month.slice(5)) - 1] ?? month;
+  const monthName = RU_MONTHS[Number(month.slice(5)) - 1] ?? month;
   const fmt = (n: number) =>
     input.currency === "USD" ? `$${Math.round(n).toLocaleString("en-US")}` : `${Math.round(n)} ${input.currency}`;
   const ping = (title: string, body: string, tag: string, delay = 0) => {

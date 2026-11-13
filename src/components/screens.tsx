@@ -4,14 +4,11 @@ import {
   eachDayOfInterval,
   endOfMonth,
   endOfWeek,
-  format,
   isSameMonth,
   isToday,
-  parseISO,
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { ru } from "date-fns/locale";
 import {
   CalendarDays,
   Check,
@@ -49,11 +46,14 @@ import { BudgetScreen } from "@/components/budget-screen";
 import { GamesScreen } from "@/components/games-screen";
 import { NewTaskSheet } from "@/components/new-task-sheet";
 import { NewWishSheet } from "@/components/new-wish-sheet";
-import { BirthdayPicker } from "@/components/birthday-picker";
+import { DatePicker } from "@/components/date-picker";
+import { PairCode } from "@/components/pair-code";
+import { SheetHeader } from "@/components/sheet-header";
 import { EmptyState, ScreenHeader, UsBadge } from "@/components/ui/shell";
 import { WishPhoto } from "@/components/wish-photo";
 import { useCouple, usePlayerColors, viewedOwner, viewedWishOwner, type CheckList, type Task, type TaskOwner, type Wish } from "@/lib/couple-store";
-import { pieceBg, type PieceColor } from "@/lib/pair-color";
+import { capitalRu, formatRuDay, formatRuWeekday, RU_MONTHS, toIsoDate } from "@/lib/dates";
+import { pieceBg, pieceCss, type PieceColor } from "@/lib/pair-color";
 import { leaveSharedPair } from "@/lib/leave-pair";
 import { refreshPairTasks, refreshPairWishes } from "@/lib/pair-live";
 import { openCompatibilityQuiz } from "@/lib/quiz-live";
@@ -65,11 +65,6 @@ import { AccountLogoutButton } from "@/components/account-logout";
 import { LoginActivity } from "@/components/login-activity";
 import { PasswordSettings } from "@/components/password-settings";
 import { saveMyProfile } from "@/lib/pair-server";
-
-function promptTitle(label: string) {
-  const value = window.prompt(label);
-  return value?.trim() || "";
-}
 
 export function TasksScreen() {
   useScreenPoll("tasks", true, LIST_POLL_MS, refreshPairTasks);
@@ -598,16 +593,11 @@ function asList(raw: Task["subtasks"] | string[] | undefined) {
 function createdDate(task: Task) {
   const raw = task.createdAt || "";
   if (raw.length >= 10) return raw.slice(0, 10);
-  return format(new Date(), "yyyy-MM-dd");
+  return toIsoDate(new Date());
 }
 
 function formatDue(date: string) {
-  if (!date) return "";
-  try {
-    return format(new Date(`${date}T12:00:00`), "d MMMM", { locale: ru });
-  } catch {
-    return date;
-  }
+  return formatRuDay(date, "dayMonth") || date;
 }
 
 function dotClass(owner: TaskOwner | "free", colors: { me: PieceColor; partner: PieceColor }) {
@@ -621,21 +611,21 @@ function Chip({
   children,
   active,
   tone,
+  piece,
   onClick,
 }: {
   children: string;
   active?: boolean;
-  tone: "white" | "blue" | "pink" | "red";
+  tone: "white" | "piece" | "red";
+  piece?: PieceColor;
   onClick: () => void;
 }) {
   const on =
     tone === "white"
       ? "bg-cream text-cream-fg"
-      : tone === "blue"
-        ? "bg-blue text-bg"
-        : tone === "pink"
-          ? "bg-pink text-bg"
-          : "bg-red text-fg";
+      : tone === "piece"
+        ? `${pieceBg(piece ?? "blue")} text-bg`
+        : "bg-red text-fg";
   return (
     <button
       type="button"
@@ -651,7 +641,8 @@ export function CalendarScreen() {
   useScreenPoll("tasks", true, LIST_POLL_MS, refreshPairTasks);
   const colors = usePlayerColors();
   const [cursor, setCursor] = useState(new Date());
-  const [selected, setSelected] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [selected, setSelected] = useState(toIsoDate(new Date()));
+  const [composer, setComposer] = useState(false);
   const [mode, setMode] = useState<"overview" | "month" | "week">("overview");
   const events = useCouple((s) => s.events);
   const tasks = useCouple((s) => s.tasks);
@@ -713,20 +704,19 @@ export function CalendarScreen() {
     });
   }, [calendarItems, selected]);
 
-  const add = () => {
-    const title = promptTitle("Событие");
-    if (!title) return;
-    addEvent(title, format(cursor, "yyyy-MM-dd"));
+  const add = (title: string, date: string) => {
+    addEvent(title, date);
+    setComposer(false);
   };
 
   return (
     <section className="flex min-h-0 w-full min-w-0 flex-1 flex-col px-5 pb-28">
       <p className="min-w-0 pt-5 text-[13px] text-muted uppercase">
-        {format(new Date(), "EEEE, d MMMM yyyy", { locale: ru })}
+        {formatRuWeekday(new Date())}
       </p>
       <div className="mt-2 flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <h1 className="min-w-0 text-[32px] leading-none font-semibold capitalize">
-          {format(cursor, "LLLL", { locale: ru })}
+          {capitalRu(RU_MONTHS[cursor.getMonth()] ?? "")}
         </h1>
         <div className="flex max-w-full shrink-0 items-center">
           <button type="button" className="grid size-9 place-items-center rounded-xl bg-raised" aria-label="Календарь">
@@ -780,7 +770,7 @@ export function CalendarScreen() {
         {days.map((day) => {
           const current = isSameMonth(day, cursor);
           const today = isToday(day);
-          const key = format(day, "yyyy-MM-dd");
+          const key = toIsoDate(day);
           const picked = key === selected;
           const dayTasks = calendarItems.filter((i) => i.date === key).slice(0, 4);
           return (
@@ -801,7 +791,7 @@ export function CalendarScreen() {
                         : "text-muted/40"
                 }`}
               >
-                {format(day, "d")}
+                {day.getDate()}
               </span>
               {dayTasks.length ? (
                 <span className="flex h-1.5 items-center justify-center gap-0.5">
@@ -830,9 +820,9 @@ export function CalendarScreen() {
           {orderedItems.map((item) => {
             const glow =
               item.owner === "me"
-                ? "var(--color-blue)"
+                ? pieceCss(colors.me)
                 : item.owner === "partner"
-                  ? "var(--color-pink)"
+                  ? pieceCss(colors.partner)
                   : item.owner === "both"
                     ? "var(--color-red)"
                     : "var(--color-cream)";
@@ -859,7 +849,7 @@ export function CalendarScreen() {
                 >
                   <div className={active && !done ? "task-glow-inner" : active && done ? "" : "px-4 py-3"}>
                     <p className="text-sm text-muted">
-                      {item.date}
+                      {formatRuDay(item.date, "long") || item.date}
                       {item.kind === "task" ? " · задача" : item.kind === "list" ? " · список" : ""}
                       {done ? " · готово" : ""}
                     </p>
@@ -874,13 +864,81 @@ export function CalendarScreen() {
 
       <button
         type="button"
-        onClick={add}
+        onClick={() => setComposer(true)}
         className="fixed right-5 bottom-24 grid size-14 place-items-center rounded-full bg-blue text-bg"
         aria-label="Добавить событие"
       >
         <span className="text-3xl leading-none">+</span>
       </button>
+      {composer ? (
+        <EventComposer
+          initialDate={selected}
+          onClose={() => setComposer(false)}
+          onSave={add}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function EventComposer({
+  initialDate,
+  onClose,
+  onSave,
+}: {
+  initialDate: string;
+  onClose: () => void;
+  onSave: (title: string, date: string) => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState(initialDate);
+  const [pick, setPick] = useState(false);
+  return (
+    <div className="fixed inset-0 z-[80] bg-bg">
+      <div className="mx-auto flex h-full min-w-0 max-w-md flex-col overflow-x-hidden">
+        <SheetHeader
+          title="Событие"
+          onCancel={onClose}
+          onDone={() => {
+            if (title.trim()) onSave(title.trim(), date);
+          }}
+          doneMuted={!title.trim()}
+          doneTone="fg"
+        />
+        <div className="space-y-3 px-4">
+          <label className="block rounded-2xl bg-raised px-4 py-3">
+            <span className="text-[11px] tracking-wider text-muted">НАЗВАНИЕ</span>
+            <input
+              autoFocus
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Ужин, поездка, визит"
+              className="mt-1 w-full bg-transparent text-[17px] outline-none placeholder:text-muted"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => setPick(true)}
+            className="flex w-full items-center justify-between rounded-2xl bg-raised px-4 py-4"
+          >
+            <span>Когда</span>
+            <span className="text-[15px]">{formatRuDay(date, "long")}</span>
+          </button>
+        </div>
+      </div>
+      {pick ? (
+        <DatePicker
+          mode="any"
+          label="Дата события"
+          value={date}
+          onPick={(day) => {
+            setDate(day);
+            setPick(false);
+          }}
+          onClose={() => setPick(false)}
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -892,6 +950,7 @@ export function WishesScreen() {
   const myName = useCouple((s) => s.myName);
   const partnerName = useCouple((s) => s.partnerName);
   const myUserId = useCouple((s) => s.myUserId);
+  const colors = usePlayerColors();
   const [sheet, setSheet] = useState<"new" | Wish | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const selected = wishes.find((w) => w.id === openId);
@@ -915,10 +974,10 @@ export function WishesScreen() {
         <>
           <ScreenHeader title="Хотелки" onAdd={() => setSheet("new")} />
           <div className="flex min-w-0 flex-wrap gap-2 px-5 pb-2">
-            <Chip tone="pink" active={filter === "partner"} onClick={() => setFilter("partner")}>
+            <Chip tone="piece" piece={colors.partner} active={filter === "partner"} onClick={() => setFilter("partner")}>
               {`${partnerName} · ${partnerCount}`}
             </Chip>
-            <Chip tone="blue" active={filter === "me"} onClick={() => setFilter("me")}>
+            <Chip tone="piece" piece={colors.me} active={filter === "me"} onClick={() => setFilter("me")}>
               {`${myName} · ${myCount}`}
             </Chip>
             <Chip tone="white" active={filter === "all"} onClick={() => setFilter("all")}>
@@ -1006,7 +1065,7 @@ function WishRow({ wish, onOpen }: { wish: Wish; onOpen: () => void }) {
 
 function fulfilledLabel(iso?: string) {
   const date = new Date(iso || Date.now());
-  const month = format(date, "LLLL", { locale: ru });
+  const month = RU_MONTHS[date.getMonth()] ?? "";
   const prep: Record<string, string> = {
     январь: "январе",
     февраль: "феврале",
@@ -1066,9 +1125,7 @@ function WishDetail({
   const colors = usePlayerColors();
   const [menu, setMenu] = useState(false);
   const side = viewedWishOwner(wish, myUserId);
-  const when = wish.createdAt
-    ? format(new Date(wish.createdAt), "d MMMM", { locale: ru })
-    : format(new Date(), "d MMMM", { locale: ru });
+  const when = formatRuDay(toIsoDate(wish.createdAt ? new Date(wish.createdAt) : new Date()), "dayMonth");
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -1384,7 +1441,7 @@ function ListDetail({ list, onBack }: { list: CheckList; onBack: () => void }) {
                 itemDate ? "bg-[#163a3c] text-[#6ed7dc]" : "rounded-full bg-chip text-fg"
               }`}
             >
-              {itemDate ? format(new Date(`${itemDate}T12:00:00`), "MMM d").toUpperCase() : "ДАТА"}
+              {itemDate ? formatRuDay(itemDate, "dayMonthShort") : "Дата"}
             </button>
             <button type="button" onClick={commit} className="text-[15px] text-muted">
               Готово
@@ -1394,7 +1451,7 @@ function ListDetail({ list, onBack }: { list: CheckList; onBack: () => void }) {
             <div className="mt-3 flex items-center justify-between text-[15px]">
               <span>Дата пункта</span>
               <span className="rounded-md bg-[#163a3c] px-3 py-1 text-[12px] font-semibold text-[#6ed7dc]">
-                {format(new Date(`${itemDate}T12:00:00`), "MMM d").toUpperCase()}
+                {formatRuDay(itemDate, "dayMonthShort")}
               </span>
             </div>
           ) : null}
@@ -1441,7 +1498,7 @@ function ListDetail({ list, onBack }: { list: CheckList; onBack: () => void }) {
                   : "rounded-md bg-chip px-2 py-1 text-[11px] tracking-wide text-muted"
               }
             >
-              {item.date ? format(new Date(`${item.date}T12:00:00`), "MMM d").toUpperCase() : "ДАТА"}
+              {item.date ? formatRuDay(item.date, "dayMonthShort") : "Дата"}
             </button>
           </li>
         ))}
@@ -1456,8 +1513,10 @@ function ListDetail({ list, onBack }: { list: CheckList; onBack: () => void }) {
         <ChevronRight className="size-4 text-muted" />
       </button>
       {pick ? (
-        <MiniDatePicker
-          value={pick === "new" ? itemDate : list.items.find((i) => i.id === pick)?.date}
+        <DatePicker
+          mode="any"
+          label="Дата пункта"
+          value={(pick === "new" ? itemDate : list.items.find((i) => i.id === pick)?.date) ?? ""}
           onPick={(day) => {
             if (pick === "new") setItemDate(day);
             else updateListItem(list.id, pick, { date: day });
@@ -1467,73 +1526,6 @@ function ListDetail({ list, onBack }: { list: CheckList; onBack: () => void }) {
         />
       ) : null}
     </section>
-  );
-}
-
-function MiniDatePicker({
-  value,
-  onPick,
-  onClose,
-}: {
-  value?: string;
-  onPick: (day: string) => void;
-  onClose: () => void;
-}) {
-  const [cursor, setCursor] = useState(() => (value ? new Date(`${value}T12:00:00`) : new Date()));
-  const days = eachDayOfInterval({
-    start: startOfWeek(startOfMonth(cursor), { weekStartsOn: 0 }),
-    end: endOfWeek(endOfMonth(cursor), { weekStartsOn: 0 }),
-  });
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={onClose}>
-      <div
-        className="w-full rounded-t-3xl bg-raised px-5 pt-4 pb-8"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-3 flex items-center justify-between">
-          <button type="button" onClick={() => setCursor((d) => addMonths(d, -1))}>
-            <ChevronLeft className="size-5" />
-          </button>
-          <p className="text-[17px] font-semibold capitalize">
-            {format(cursor, "LLLL yyyy", { locale: ru })}
-          </p>
-          <button type="button" onClick={() => setCursor((d) => addMonths(d, 1))}>
-            <ChevronRight className="size-5" />
-          </button>
-        </div>
-        <div className="grid grid-cols-7 text-center text-[11px] text-muted">
-          {["ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"].map((d) => (
-            <div key={d}>{d}</div>
-          ))}
-        </div>
-        <div className="mt-2 grid grid-cols-7 gap-y-1 text-center">
-          {days.map((day) => {
-            const key = format(day, "yyyy-MM-dd");
-            const picked = key === value;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => onPick(key)}
-                className={`mx-auto grid size-9 place-items-center rounded-full text-[15px] ${
-                  picked
-                    ? "bg-[#163a3c] text-[#6ed7dc]"
-                    : isSameMonth(day, cursor)
-                      ? "text-fg"
-                      : "text-muted/40"
-                }`}
-              >
-                {format(day, "d")}
-              </button>
-            );
-          })}
-        </div>
-        <button type="button" onClick={onClose} className="mt-4 w-full py-3 text-muted">
-          Закрыть
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -1675,7 +1667,7 @@ function BirthdaySettings({ onBack }: { onBack: () => void }) {
   const setPartnerBirthday = useCouple((s) => s.setPartnerBirthday);
   const myLocked = Boolean(myBirthday) && myBirthdayEdits >= 1;
   const partnerLocked = Boolean(partnerBirthday) && partnerBirthdayEdits >= 1;
-  const prettyCode = (inviteCode ?? "").split("").join(" ");
+  const joined = useCouple((s) => s.joined);
   const saveMine = (iso: string) => {
     const ok = setMyBirthday(iso);
     if (ok) void saveMyProfile({ data: { birthday: iso } }).catch(() => undefined);
@@ -1692,9 +1684,16 @@ function BirthdaySettings({ onBack }: { onBack: () => void }) {
       <PasswordSettings />
       <LoginActivity />
       <ColorChoice />
-      <div className="mt-4 rounded-[22px] bg-raised px-5 py-5">
-        <p className="text-[13px] text-muted">Твой код</p>
-        <p className="mt-3 text-[28px] font-semibold tracking-[0.18em] text-pink">{prettyCode}</p>
+      <div className="mt-4">
+        <PairCode
+          code={inviteCode}
+          label="Твой код"
+          hint={
+            joined
+              ? "Пара уже собрана. Этим кодом партнёр вошёл. Новый человек по нему не подключится."
+              : "Партнёр вводит этот код у себя. В паре только двое."
+          }
+        />
       </div>
       <BirthdayField
         label="Мой день рождения"
@@ -1781,9 +1780,7 @@ function BirthdayField({
   const [draft, setDraft] = useState(value);
   const [msg, setMsg] = useState("");
   const [open, setOpen] = useState(false);
-  const shown = draft
-    ? format(parseISO(draft), "d MMMM yyyy", { locale: ru })
-    : "Выбрать дату";
+  const shown = draft ? formatRuDay(draft, "long") : "Выбрать дату";
 
   return (
     <div className="mt-3 rounded-[22px] bg-raised px-5 py-5">
@@ -1796,11 +1793,13 @@ function BirthdayField({
           draft ? "text-fg" : "text-muted"
         } ${locked ? "opacity-60" : ""}`}
       >
-        <span className="capitalize">{shown}</span>
+        <span>{shown}</span>
         {locked ? null : <span className="text-muted">›</span>}
       </button>
       {open && !locked ? (
-        <BirthdayPicker
+        <DatePicker
+          mode="birthday"
+          label={label}
           value={draft}
           onPick={(iso) => {
             setDraft(iso);
