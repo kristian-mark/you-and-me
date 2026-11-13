@@ -298,7 +298,8 @@ export function reopenDurak(latest: TurnSnapshot<DurakState>): "join" | "begin" 
 }
 
 export const DURAK_CARD_W = 64;
-export const DURAK_CARD_MIN_STEP = 22;
+/** Narrowest exposed strip that stays tappable. Twelve cards then fit a 240px tray; six cards stay wider. */
+export const DURAK_CARD_MIN_STEP = 16;
 
 /** Exposed width of each card after the first. Shrinks to fit the tray; never below a tappable strip. */
 export function handFanStep(available: number, count: number, card = DURAK_CARD_W, minStep = DURAK_CARD_MIN_STEP) {

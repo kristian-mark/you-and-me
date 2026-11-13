@@ -204,15 +204,20 @@ test("бито on the defender's turn names the rule", () => {
   });
 });
 
-test("six and eight cards fit a 240px tray, and a very large hand scrolls", () => {
-  const tray = 240;
-  for (const count of [6, 8]) {
+test("six cards keep their step, and up to twelve fit a 240px tray", () => {
+  const tray = 239;
+  const six = handFanStep(tray, 6);
+  assert.equal(six, (tray - DURAK_CARD_W) / 5);
+  assert.ok(six > DURAK_CARD_MIN_STEP);
+  for (const count of [6, 8, 10, 12]) {
     const step = handFanStep(tray, count);
     const width = DURAK_CARD_W + (count - 1) * step;
-    assert.ok(width <= tray + 0.01, `${count} cards span ${width}`);
+    assert.ok(width <= 240.01, `${count} cards span ${width}`);
     assert.ok(step >= DURAK_CARD_MIN_STEP);
   }
+  const ten = handFanStep(tray, 10);
+  assert.ok(ten >= 18);
   const crowded = handFanStep(tray, 20);
   assert.equal(crowded, DURAK_CARD_MIN_STEP);
-  assert.ok(DURAK_CARD_W + 19 * crowded > tray);
+  assert.ok(DURAK_CARD_W + 19 * crowded > 240);
 });

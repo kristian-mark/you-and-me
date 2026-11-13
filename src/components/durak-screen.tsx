@@ -115,9 +115,21 @@ function HandFan({
 
   const nudge = (direction: number) => box.current?.scrollBy({ left: direction * 72, behavior: "smooth" });
 
+  const nudgeButton = (direction: -1 | 1) => (
+    <button
+      type="button"
+      aria-label={direction < 0 ? "Карты левее" : "Карты правее"}
+      onClick={() => nudge(direction)}
+      className="relative z-30 mb-1 grid size-11 shrink-0 place-items-center rounded-full bg-raised text-cream"
+    >
+      {direction < 0 ? <ChevronLeft className="size-5" /> : <ChevronRight className="size-5" />}
+    </button>
+  );
+
   return (
-    <div className="relative mt-4 min-w-0">
-      <div ref={box} data-hand-tray className="w-full min-w-0 overflow-x-auto pt-4 pb-1">
+    <div className="mt-4 flex min-w-0 items-end gap-1">
+      {scrolls && edges.left ? nudgeButton(-1) : null}
+      <div ref={box} data-hand-tray className="min-w-0 flex-1 overflow-x-auto pt-4 pb-1">
         <div className="flex w-max items-end">
           {cards.map((card, index) => (
             <div
@@ -130,26 +142,7 @@ function HandFan({
           ))}
         </div>
       </div>
-      {scrolls && edges.left ? (
-        <button
-          type="button"
-          aria-label="Карты левее"
-          onClick={() => nudge(-1)}
-          className="absolute top-4 left-0 grid h-[90px] w-9 place-items-center bg-gradient-to-r from-bg via-bg/80 to-transparent text-cream"
-        >
-          <ChevronLeft className="size-5" />
-        </button>
-      ) : null}
-      {scrolls && edges.right ? (
-        <button
-          type="button"
-          aria-label="Карты правее"
-          onClick={() => nudge(1)}
-          className="absolute top-4 right-0 grid h-[90px] w-9 place-items-center bg-gradient-to-l from-bg via-bg/80 to-transparent text-cream"
-        >
-          <ChevronRight className="size-5" />
-        </button>
-      ) : null}
+      {scrolls && edges.right ? nudgeButton(1) : null}
     </div>
   );
 }
