@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { prepareAlbumUpload } from "@/lib/album-image";
+import { SheetHeader } from "@/components/sheet-header";
 import { getAlbumHome, type AlbumPhoto } from "@/lib/album-server";
 import { uploadChatImage, uploadChatVoice } from "@/lib/chat-image";
 import {
@@ -704,11 +705,8 @@ function Sheet({
         className="app-frame mx-auto max-h-[70dvh] w-full overflow-y-auto rounded-t-3xl bg-raised pb-[max(0.75rem,env(safe-area-inset-bottom))]"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 pt-3">
-          <p className="text-[15px] text-muted">{title ?? ""}</p>
-          <button type="button" onClick={onClose} className="grid size-11 place-items-center" aria-label="Закрыть">
-            <X className="size-5" />
-          </button>
+        <div className="px-4">
+          <SheetHeader title={title || "Ещё"} onCancel={onClose} cancelLabel="Закрыть" flush />
         </div>
         {children}
       </div>

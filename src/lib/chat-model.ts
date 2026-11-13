@@ -1,5 +1,7 @@
 /** Pure chat rules: pair access, query shape, receipts, cards, and media limits. */
 
+import { formatRuDay, formatRuInstant, toIsoDate } from "./dates.ts";
+
 export const CHAT_BUCKET = "chat";
 export const CHAT_POLL_MS = 4_000;
 export const CHAT_BADGE_POLL_MS = 60_000;
@@ -75,36 +77,6 @@ export type ChatAccess =
   | { ok: false; reason: "none" | "waiting" | "outsider" };
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,80}$/;
-
-const MONTHS = [
-  "ЯНВАРЯ",
-  "ФЕВРАЛЯ",
-  "МАРТА",
-  "АПРЕЛЯ",
-  "МАЯ",
-  "ИЮНЯ",
-  "ИЮЛЯ",
-  "АВГУСТА",
-  "СЕНТЯБРЯ",
-  "ОКТЯБРЯ",
-  "НОЯБРЯ",
-  "ДЕКАБРЯ",
-];
-
-const MONTHS_LOWER = [
-  "января",
-  "февраля",
-  "марта",
-  "апреля",
-  "мая",
-  "июня",
-  "июля",
-  "августа",
-  "сентября",
-  "октября",
-  "ноября",
-  "декабря",
-];
 
 const MESSAGE_COLUMNS =
   "id,pair_id,author_user_id,kind,body,created_at,deleted_at,card_kind,card_id,card_title,card_subtitle,object_path,thumb_path,mime,byte_size,width,height,duration_ms";
@@ -359,15 +331,11 @@ export function chatClock(iso: string) {
 export function chatDayKey(iso: string) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
+  return toIsoDate(date);
 }
 
 export function chatDateLabel(iso: string) {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
+  return formatRuInstant(iso, "dayMonth").toUpperCase();
 }
 
 export function groupByDay<T extends { createdAt: string }>(items: T[]) {
@@ -383,9 +351,7 @@ export function groupByDay<T extends { createdAt: string }>(items: T[]) {
 
 export function prettyCardSubtitle(kind: ChatCardKind, subtitle: string) {
   if ((kind === "event" || kind === "task") && /^\d{4}-\d{2}-\d{2}$/.test(subtitle)) {
-    const date = new Date(`${subtitle}T12:00:00`);
-    if (Number.isNaN(date.getTime())) return subtitle;
-    return `${date.getDate()} ${MONTHS_LOWER[date.getMonth()]}`;
+    return formatRuDay(subtitle, "dayMonth") || subtitle;
   }
   return subtitle;
 }

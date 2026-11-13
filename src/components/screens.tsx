@@ -1169,7 +1169,7 @@ function WishDetail({
   const when = formatRuDay(toIsoDate(wish.createdAt ? new Date(wish.createdAt) : new Date()), "dayMonth");
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="relative flex min-h-0 flex-1 flex-col">
       <div className="relative h-56 shrink-0 overflow-hidden bg-raised">
         <WishPhoto
           wish={wish}
@@ -1225,7 +1225,7 @@ function WishDetail({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 pb-36">
+      <div className="flex-1 overflow-y-auto px-5 pb-[calc(16rem+env(safe-area-inset-bottom))]">
         <p className="mt-5 flex items-center gap-2 text-[14px] text-muted">
           <span className={`size-3 rounded-full ${pieceBg(side === "me" ? colors.me : colors.partner)}`} />
           {side === "me" ? "Ты" : partnerName} · {when}
