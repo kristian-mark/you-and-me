@@ -53,6 +53,18 @@ import {
   type RevState,
 } from "./reversi.ts";
 import {
+  beginSea,
+  idleSeaView,
+  newSeaMatch,
+  presentSea,
+  readSeaState,
+  rebaseSeaSetup,
+  seaMayAct,
+  type SeaMatchView,
+  type SeaMove,
+  type SeaState,
+} from "./sea.ts";
+import {
   beginTtt,
   idleTttView,
   newTttMatch,
@@ -177,6 +189,9 @@ type MatchKit<TState, TView> = {
   present: (snapshot: TurnSnapshot<TState>, version: number, seat: Seat, updatedAt: string | null) => TView;
   idle: () => TView;
   apply: (snapshot: TurnSnapshot<TState>, seat: Seat, move: unknown) => TurnStep<TState>;
+  mayAct?: (snapshot: TurnSnapshot<TState>, seat: Seat, move: unknown) => boolean;
+  /** When the client version is stale, replay this move on the latest row. Null keeps the strict conflict. */
+  rebase?: (snapshot: TurnSnapshot<TState>, seat: Seat, move: unknown) => TurnStep<TState> | null;
   repair?: (snapshot: TurnSnapshot<TState>) => TurnStep<TState> | null;
 };
 
@@ -212,22 +227,35 @@ function createMatch<TState, TView>(kit: MatchKit<TState, TView>) {
 
   async function play(userId: string, move: unknown, version: number): Promise<TView> {
     const { pair, pairId, seat } = await requirePair(userId);
-    const row = await loadRow(pairId, kit.game);
-    if (!row?.turn_user_id) throw new TurnRuleError("turn", "Сначала начни игру");
-    if (row.turn_user_id !== userId) throw new TurnRuleError("turn", "Сейчас ход партнёра");
-    const current = toSnapshot(row, pair, kit.read);
-    if (current.version !== version) throw new TurnConflictError();
-    const step = kit.apply(current.snapshot, seat, move);
-    const now = new Date().toISOString();
-    const saved = await compareAndSwap(
-      pairId,
-      kit.game,
-      current.version,
-      `status=eq.active&${eqFilter("turn_user_id", userId)}`,
-      fields(pair, step, current.version + 1, now),
-    );
-    if (!saved) throw new TurnConflictError();
-    return show(step, current.version + 1, seat, saved.updated_at ?? now);
+    let row = await loadRow(pairId, kit.game);
+    if (!row) throw new TurnRuleError("turn", "Сначала начни игру");
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const current = toSnapshot(row, pair, kit.read);
+      const stale = current.version !== version;
+      const rebasing = stale ? (kit.rebase?.(current.snapshot, seat, move) ?? null) : null;
+      if (stale && !rebasing) throw new TurnConflictError();
+      const relaxed = Boolean(rebasing) || (kit.mayAct?.(current.snapshot, seat, move) ?? false);
+      if (!relaxed) {
+        if (!row.turn_user_id) throw new TurnRuleError("turn", "Сначала начни игру");
+        if (row.turn_user_id !== userId) throw new TurnRuleError("turn", "Сейчас ход партнёра");
+      }
+      const step = rebasing ?? kit.apply(current.snapshot, seat, move);
+      const now = new Date().toISOString();
+      const guard = relaxed ? "status=eq.active" : `status=eq.active&${eqFilter("turn_user_id", userId)}`;
+      const saved = await compareAndSwap(
+        pairId,
+        kit.game,
+        current.version,
+        guard,
+        fields(pair, step, current.version + 1, now),
+      );
+      if (saved) return show(step, current.version + 1, seat, saved.updated_at ?? now);
+      if (!relaxed) throw new TurnConflictError();
+      const fresh = await loadRow(pairId, kit.game);
+      if (!fresh) throw new TurnConflictError();
+      row = fresh;
+    }
+    throw new TurnConflictError();
   }
 
   async function open(userId: string, version: number): Promise<TView> {
@@ -320,6 +348,19 @@ const dotsMatch = createMatch<DotsState, DotsMatchView>({
   present: presentDots,
   idle: idleDotsView,
   apply: (snapshot, seat, move) => turnGames.dots.apply(snapshot, seat, move as DotsMove),
+});
+
+const seaMatch = createMatch<SeaState, SeaMatchView>({
+  game: turnGames.sea.type,
+  empty: () => turnGames.sea.empty(),
+  read: readSeaState,
+  begin: beginSea,
+  reset: newSeaMatch,
+  present: presentSea,
+  idle: idleSeaView,
+  mayAct: seaMayAct,
+  rebase: rebaseSeaSetup,
+  apply: (snapshot, seat, move) => turnGames.sea.apply(snapshot, seat, move as SeaMove),
 });
 
 function parseVersion(value: unknown) {
@@ -534,6 +575,51 @@ export const openNewCheckersMatch = createServerFn({ method: "POST" })
   .handler(async ({ context, data }): Promise<CheckersMatchView> => {
     try {
       return await checkersMatch.open(context.userId, data.version);
+    } catch (error) {
+      textOf(error);
+    }
+  });
+
+export const loadSeaMatch = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }): Promise<SeaMatchView> => {
+    try {
+      return await seaMatch.load(context.userId);
+    } catch (error) {
+      textOf(error);
+    }
+  });
+
+export const playSeaMove = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: unknown) => {
+    if (!input || typeof input !== "object") throw new Error("Некорректный ход");
+    const raw = input as { kind?: unknown; index?: unknown; version?: unknown };
+    const version = parseVersion(raw.version);
+    if (raw.kind === "reshuffle" || raw.kind === "ready") return { kind: raw.kind, version };
+    if (raw.kind === "shot" && typeof raw.index === "number" && Number.isInteger(raw.index) && raw.index >= 0 && raw.index < 100) {
+      return { kind: "shot" as const, index: raw.index, version };
+    }
+    throw new Error("Некорректный ход");
+  })
+  .handler(async ({ context, data }): Promise<SeaMatchView> => {
+    try {
+      const move = data.kind === "shot" ? { kind: data.kind, index: data.index } : { kind: data.kind };
+      return await seaMatch.play(context.userId, move, data.version);
+    } catch (error) {
+      textOf(error);
+    }
+  });
+
+export const openNewSeaMatch = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: unknown) => {
+    if (!input || typeof input !== "object") throw new Error("Некорректная партия");
+    return { version: parseVersion((input as { version?: unknown }).version) };
+  })
+  .handler(async ({ context, data }): Promise<SeaMatchView> => {
+    try {
+      return await seaMatch.open(context.userId, data.version);
     } catch (error) {
       textOf(error);
     }

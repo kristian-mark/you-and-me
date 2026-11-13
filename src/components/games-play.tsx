@@ -1,21 +1,14 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { useCouple, usePlayerColors } from "@/lib/couple-store";
-import { pieceBg } from "@/lib/pair-color";
+import { useCouple } from "@/lib/couple-store";
 import {
-  FLEET_LENGTHS,
   type Bout,
   type DCard,
   type DurakState,
-  type Ship,
-  type ShotMap,
   type Side,
-  addShip,
   cardLabel,
   durakApply,
   durakLegal,
-  fireAt,
   newDurak,
-  randomFleet,
 } from "@/lib/games";
 
 function useNames() {
@@ -55,22 +48,6 @@ function Shell({
   );
 }
 
-function usePieceClass() {
-  const colors = usePlayerColors();
-  return (side: Side) => pieceBg(side === "me" ? colors.me : colors.partner);
-}
-
-function Turn({ side }: { side: Side }) {
-  const { name } = useNames();
-  const pieceClass = usePieceClass();
-  return (
-    <p className="mt-3 flex items-center gap-2 text-[15px] text-muted">
-      <span className={`size-3 rounded-full ${pieceClass(side)}`} />
-      Ход · {name(side)}
-    </p>
-  );
-}
-
 function Outcome({
   result,
   onAgain,
@@ -90,163 +67,6 @@ function Outcome({
         Ещё партию
       </button>
     </div>
-  );
-}
-
-function SeaGrid({
-  ships,
-  shots,
-  hide,
-  onCell,
-}: {
-  ships: Ship[];
-  shots: ShotMap;
-  hide: boolean;
-  onCell?: (r: number, c: number) => void;
-}) {
-  return (
-    <div className="grid grid-cols-10 gap-px overflow-hidden rounded-2xl bg-line">
-      {Array.from({ length: 100 }, (_, i) => {
-        const r = Math.floor(i / 10);
-        const c = i % 10;
-        const ship = ships.find((item) => item.cells.some((cell) => cell.r === r && cell.c === c));
-        const shot = shots[`${r},${c}`];
-        const sunk = ship && ship.hits >= ship.cells.length;
-        let tone = "bg-bg";
-        if (shot === "miss") tone = "bg-chip";
-        else if (shot === "hit") tone = sunk ? "bg-pink" : "bg-blue";
-        else if (ship && !hide) tone = "bg-blue";
-        return (
-          <button
-            key={i}
-            type="button"
-            disabled={!onCell}
-            onClick={() => onCell?.(r, c)}
-            className={`aspect-square ${tone}`}
-            aria-label={`${r + 1} ${c + 1}`}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
-
-export function Battleship({ onBack, onAgain }: { onBack: () => void; onAgain: () => void }) {
-  const { name } = useNames();
-  const [fleets, setFleets] = useState<Record<Side, Ship[]>>({ me: [], partner: [] });
-  const [shots, setShots] = useState<Record<Side, ShotMap>>({ me: {}, partner: {} });
-  const [horiz, setHoriz] = useState(true);
-  const [phase, setPhase] = useState<{ kind: "place" | "pass" | "fight" | "end"; who: Side; note?: string }>({
-    kind: "place",
-    who: "me",
-  });
-  const [winner, setWinner] = useState<Side | null>(null);
-  useAward(winner);
-  const who = phase.who;
-  const nextLen = FLEET_LENGTHS[fleets[who].length];
-
-  const place = (r: number, c: number) => {
-    if (phase.kind !== "place" || nextLen === undefined) return;
-    const next = addShip(fleets[who], r, c, nextLen, horiz);
-    if (!next) return;
-    const fleetsNext = { ...fleets, [who]: next };
-    setFleets(fleetsNext);
-    if (next.length === FLEET_LENGTHS.length) {
-      const otherSide: Side = who === "me" ? "partner" : "me";
-      if (who === "me") setPhase({ kind: "pass", who: otherSide, note: "Расставь корабли" });
-      else setPhase({ kind: "pass", who: "me", note: "Первый выстрел" });
-    }
-  };
-
-  const randomize = () => {
-    const fleet = randomFleet();
-    const fleetsNext = { ...fleets, [who]: fleet };
-    setFleets(fleetsNext);
-    const otherSide: Side = who === "me" ? "partner" : "me";
-    if (who === "me") setPhase({ kind: "pass", who: otherSide, note: "Расставь корабли" });
-    else setPhase({ kind: "pass", who: "me", note: "Первый выстрел" });
-  };
-
-  const shoot = (r: number, c: number) => {
-    if (phase.kind !== "fight") return;
-    const enemy: Side = who === "me" ? "partner" : "me";
-    const res = fireAt(fleets[enemy], shots[enemy], r, c);
-    if (res.result === "repeat") return;
-    setFleets({ ...fleets, [enemy]: res.ships });
-    setShots({ ...shots, [enemy]: res.shots });
-    if (res.result === "win") {
-      setWinner(who);
-      setPhase({ kind: "end", who });
-      return;
-    }
-    const note = res.result === "sunk" ? "Потопил" : res.result === "hit" ? "Попадание" : "Мимо";
-    setPhase({ kind: "pass", who: enemy, note });
-  };
-
-  if (phase.kind === "pass") {
-    return (
-      <Shell title="Морской бой" onBack={onBack}>
-        <p className="mt-16 text-center text-[15px] text-muted">Передай телефон</p>
-        <p className="mt-3 text-center text-[28px] font-semibold">{name(phase.who)}</p>
-        {phase.note ? <p className="mt-2 text-center text-muted">{phase.note}</p> : null}
-        <button
-          type="button"
-          onClick={() =>
-            setPhase(
-              fleets[phase.who].length < FLEET_LENGTHS.length
-                ? { kind: "place", who: phase.who }
-                : { kind: "fight", who: phase.who },
-            )
-          }
-          className="mt-8 w-full rounded-full bg-cream py-4 text-[17px] font-semibold text-cream-fg"
-        >
-          Это я
-        </button>
-      </Shell>
-    );
-  }
-
-  if (phase.kind === "place") {
-    return (
-      <Shell title="Морской бой" onBack={onBack}>
-        <p className="mt-2 text-[15px] text-muted">{name(who)} ставит корабли. Соседние борта нельзя.</p>
-        <div className="mt-4 flex gap-2">
-          <button
-            type="button"
-            onClick={() => setHoriz((v) => !v)}
-            className="rounded-full bg-raised px-4 py-2 text-[14px]"
-          >
-            {horiz ? "Горизонтально" : "Вертикально"}
-          </button>
-          <button type="button" onClick={randomize} className="rounded-full bg-raised px-4 py-2 text-[14px]">
-            Случайно
-          </button>
-        </div>
-        <p className="mt-3 text-[14px] text-muted">
-          {nextLen ? `Сейчас корабль на ${nextLen}` : "Все на месте"} · {fleets[who].length}/{FLEET_LENGTHS.length}
-        </p>
-        <div className="mt-4">
-          <SeaGrid ships={fleets[who]} shots={{}} hide={false} onCell={place} />
-        </div>
-      </Shell>
-    );
-  }
-
-  const enemy: Side = who === "me" ? "partner" : "me";
-  return (
-    <Shell title="Морской бой" onBack={onBack}>
-      {winner ? null : <Turn side={who} />}
-      <p className="mt-4 text-[13px] tracking-[0.14em] text-muted uppercase">куда стреляешь</p>
-      <div className="mt-2">
-        <SeaGrid ships={fleets[enemy]} shots={shots[enemy]} hide onCell={winner ? undefined : shoot} />
-      </div>
-      <p className="mt-5 text-[13px] tracking-[0.14em] text-muted uppercase">твоё поле</p>
-      <div className="mt-2">
-        <SeaGrid ships={fleets[who]} shots={shots[who]} hide={false} />
-      </div>
-      {winner ? <Outcome result={winner} onAgain={onAgain} /> : null}
-    </Shell>
   );
 }
 
