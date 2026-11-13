@@ -59,9 +59,7 @@ export const deleteAlbum = createServerFn({ method: "POST" })
 export const editAlbumPhotos = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: { albumId: string; add?: string[]; remove?: string[] }) => input)
-  .handler(async ({ context, data }) => {
-    await changeAlbumPhotos(context.userId, data);
-  });
+  .handler(async ({ context, data }) => changeAlbumPhotos(context.userId, data));
 
 export const deleteAlbumPhotos = createServerFn({ method: "POST" })
   .middleware([authMiddleware])

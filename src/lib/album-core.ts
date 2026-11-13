@@ -9,6 +9,7 @@ import {
   normalizeTakenAt,
   pathBelongsToPair,
   prepareStoredImage,
+  removalQuery,
   purgeDeadline,
   quotaLimitBytes,
   SIGNED_URL_SECONDS,
@@ -20,6 +21,7 @@ import {
   assertSafeId,
   eqFilter,
   sbDelete,
+  sbDeleteReturning,
   sbInsert,
   sbInsertMany,
   sbPatch,
@@ -435,6 +437,38 @@ export async function deleteCoupleAlbum(userId: string, albumId: string) {
   await sbDelete("app_albums", `${eqFilter("pair_id", pairId)}&${eqFilter("id", album.id)}`);
 }
 
+async function deleteAlbumMembership(pairId: string, albumId: string, photoIds: string[]) {
+  const gone = new Set<string>();
+  try {
+    const bulk = await sbDeleteReturning<{ photo_id: string }>(
+      "app_album_items",
+      removalQuery(pairId, albumId, photoIds),
+    );
+    for (const row of bulk) gone.add(row.photo_id);
+  } catch {
+    // A quoted in-list can be rejected; each id is deleted on its own below.
+  }
+  for (const id of photoIds) {
+    if (gone.has(id)) continue;
+    try {
+      const one = await sbDeleteReturning<{ photo_id: string }>(
+        "app_album_items",
+        `${eqFilter("pair_id", pairId)}&${eqFilter("album_id", albumId)}&${eqFilter("photo_id", id)}`,
+      );
+      for (const row of one) gone.add(row.photo_id);
+    } catch {
+      // Confirmed against the table after the loop.
+    }
+  }
+  if (gone.size >= photoIds.length) return gone.size;
+  const left = await sbSelectAll<{ photo_id: string }>(
+    "app_album_items",
+    `${eqFilter("pair_id", pairId)}&${eqFilter("album_id", albumId)}&${inFilter("photo_id", photoIds)}&select=photo_id`,
+  );
+  const still = new Set(left.map((row) => row.photo_id));
+  return photoIds.filter((id) => !still.has(id)).length;
+}
+
 export async function changeAlbumPhotos(
   userId: string,
   input: { albumId: string; add?: string[]; remove?: string[] },
@@ -444,10 +478,8 @@ export async function changeAlbumPhotos(
   if (!album) throw new Error("Альбом не найден");
   const remove = idsOf(input.remove ?? []);
   if (remove.length) {
-    await sbDelete(
-      "app_album_items",
-      `${eqFilter("pair_id", pairId)}&${eqFilter("album_id", album.id)}&${inFilter("photo_id", remove)}`,
-    );
+    const removed = await deleteAlbumMembership(pairId, album.id, remove);
+    if (removed < remove.length) throw new Error("Не удалось убрать из альбома");
   }
   const add = await liveOwned(pairId, idsOf(input.add ?? []));
   if (add.length) {
@@ -475,6 +507,7 @@ export async function changeAlbumPhotos(
       updated_at: new Date().toISOString(),
     });
   }
+  return { removed: remove.length };
 }
 
 export async function softDeletePhotos(userId: string, photoIds: string[]) {

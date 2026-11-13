@@ -199,6 +199,29 @@ export function groupByMonth<T extends { takenAt: string }>(
     });
 }
 
+export function albumAfterRemoval(
+  album: { photoIds: string[]; coverPhotoId: string | null },
+  removeIds: string[],
+) {
+  const drop = new Set(removeIds);
+  const photoIds = album.photoIds.filter((id) => !drop.has(id));
+  const coverPhotoId = photoIds.includes(album.coverPhotoId ?? "")
+    ? album.coverPhotoId
+    : (photoIds[0] ?? null);
+  return { photoIds, coverPhotoId };
+}
+
+/** PostgREST filter for album membership rows only. Photos themselves stay. */
+export function removalQuery(pairId: string, albumId: string, photoIds: string[]) {
+  if (!pairId || !albumId || !photoIds.length) throw new Error("Нечего убирать");
+  const list = photoIds.map(quoteInValue).join(",");
+  return `pair_id=eq.${encodeURIComponent(pairId)}&album_id=eq.${encodeURIComponent(albumId)}&photo_id=in.(${list})`;
+}
+
+function quoteInValue(value: string) {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
 export function cleanTitle(raw: string) {
   let title = "";
   for (const char of raw) {

@@ -11,8 +11,9 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { prepareAlbumUpload, uploadPrepared } from "@/lib/album-image";
+import { prepareAlbumUpload, saveAlbumPhoto, uploadPrepared } from "@/lib/album-image";
 import {
+  albumAfterRemoval,
   albumSpan,
   formatBytes,
   groupByMonth,
@@ -74,10 +75,13 @@ export function AlbumScreen({ onBack }: { onBack: () => void }) {
   const cameraRef = useRef<HTMLInputElement>(null);
   const targetRef = useRef<"all" | "album" | "new">("all");
   const pageRef = useRef(page);
+  const epoch = useRef(0);
   pageRef.current = page;
 
   useScreenPoll("album", true, LIST_POLL_MS, async () => {
+    const ticket = ++epoch.current;
     const next = await getAlbumHome();
+    if (ticket !== epoch.current) return;
     setHome((prev) =>
       prev ? { ...next, photos: mergeFreshUrls(prev.photos, next.photos, Date.now()) } : next,
     );
@@ -254,7 +258,7 @@ export function AlbumScreen({ onBack }: { onBack: () => void }) {
       .sort((a, b) => (a.takenAt < b.takenAt ? 1 : -1));
     const cover = photos.find((photo) => photo.id === album.coverPhotoId) ?? albumPhotos[0];
     body = (
-      <section className="pb-28">
+      <section className={picked ? "pb-52" : "pb-28"}>
         <div className="relative h-64 overflow-hidden bg-raised">
           {cover?.thumbUrl ? (
             <img src={cover.thumbUrl} alt="" className="size-full object-cover" />
@@ -410,12 +414,14 @@ export function AlbumScreen({ onBack }: { onBack: () => void }) {
                 setPicked(null);
               })
             }
-            onSecondary={() =>
+            onSecondary={() => {
+              const ids = picked;
+              setHome((prev) => (prev ? dropFromAlbum(prev, album.id, ids) : prev));
+              setPicked(null);
               void run(async () => {
-                await editAlbumPhotos({ data: { albumId: album.id, remove: picked } });
-                setPicked(null);
-              })
-            }
+                await editAlbumPhotos({ data: { albumId: album.id, remove: ids } });
+              });
+            }}
           />
         ) : null}
       </section>
@@ -430,7 +436,7 @@ export function AlbumScreen({ onBack }: { onBack: () => void }) {
 
   if (home && page === "trash") {
     body = (
-      <section className="px-4 pt-5 pb-28">
+      <section className={picked ? "px-4 pt-5 pb-52" : "px-4 pt-5 pb-28"}>
         <Back label="Место" onClick={() => setPage("space")} />
         <div className="mt-3 flex items-start justify-between gap-3">
           <h1 className="text-[32px] font-semibold tracking-tight">Недавно удалённые</h1>
@@ -804,12 +810,23 @@ export function AlbumScreen({ onBack }: { onBack: () => void }) {
   }
 
   async function run(action: () => Promise<unknown>) {
+    ++epoch.current;
     setError("");
     try {
       await action();
-      void refreshScreen("album");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не вышло");
+    }
+    const ticket = ++epoch.current;
+    try {
+      const next = await getAlbumHome();
+      if (ticket !== epoch.current) return;
+      setHome((prev) =>
+        prev ? { ...next, photos: mergeFreshUrls(prev.photos, next.photos, Date.now()) } : next,
+      );
+      if (pageRef.current === "trash") setTrash(await getAlbumTrash());
+    } catch (err) {
+      if (ticket === epoch.current) setError(err instanceof Error ? err.message : "Не вышло");
     }
   }
 
@@ -818,7 +835,7 @@ export function AlbumScreen({ onBack }: { onBack: () => void }) {
   return (
     <section className="min-w-0 overflow-x-hidden">
       {inputs}
-      {error && home ? <p className="px-4 pt-3 text-[14px] text-move">{error}</p> : null}
+      {error ? <ErrorToast message={error} onClose={() => setError("")} /> : null}
       {body}
       {upload ? (
         <UploadToast done={upload.done} total={upload.total} fraction={upload.fraction} />
@@ -857,13 +874,8 @@ export function AlbumScreen({ onBack }: { onBack: () => void }) {
           }
           onSave={() =>
             void run(async () => {
-              const file = await openAlbumPhoto({ data: { id: current.id, download: true } });
-              const link = document.createElement("a");
-              link.href = file.url;
-              link.rel = "noopener";
-              document.body.appendChild(link);
-              link.click();
-              link.remove();
+              const file = await openAlbumPhoto({ data: { id: current.id } });
+              await saveAlbumPhoto(file.url);
             })
           }
           onAlbum={() => {
@@ -1041,7 +1053,7 @@ function PhotoGroups({
   extra?: ReactNode;
 }) {
   return (
-    <section className="pb-28">
+    <section className={picked ? "pb-52" : "pb-28"}>
       <div className="px-4 pt-5">
         <Back label={back} onClick={onBack} />
         <div className="mt-3 flex items-center justify-between gap-2">
@@ -1092,11 +1104,18 @@ function MonthList({
               <button
                 key={photo.id}
                 type="button"
+                aria-pressed={picked ? picked.includes(photo.id) : undefined}
                 onClick={() => onOpen(photo.id)}
-                className="relative aspect-square overflow-hidden bg-raised"
+                className={`relative aspect-square overflow-hidden bg-raised ${
+                  picked?.includes(photo.id) ? "ring-2 ring-blue ring-inset" : ""
+                }`}
               >
                 {photo.thumbUrl ? (
-                  <img src={photo.thumbUrl} alt="" className="size-full object-cover" />
+                  <img
+                    src={photo.thumbUrl}
+                    alt=""
+                    className={`size-full object-cover ${picked?.includes(photo.id) ? "brightness-75" : ""}`}
+                  />
                 ) : (
                   <Stripes />
                 )}
@@ -1399,11 +1418,39 @@ function MenuButton({
 function SelectDot({ on }: { on: boolean }) {
   return (
     <span
-      className={`absolute top-1.5 right-1.5 grid size-6 place-items-center rounded-full border ${on ? "border-blue bg-blue text-bg" : "border-white/80 bg-black/25"}`}
+      className={`absolute top-1.5 right-1.5 z-10 grid size-7 place-items-center rounded-full border-2 shadow-md ${
+        on ? "border-white bg-blue text-white" : "border-white bg-black/45 text-transparent"
+      }`}
     >
-      {on ? <Check className="size-3.5" /> : null}
+      <Check className="size-4" strokeWidth={3} />
     </span>
   );
+}
+
+function ErrorToast({ message, onClose }: { message: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-x-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 flex items-start gap-3 rounded-2xl bg-raised px-4 py-3 text-[15px] shadow-2xl">
+      <p className="min-w-0 flex-1 leading-snug">{message}</p>
+      <button type="button" onClick={onClose} className="shrink-0 text-muted" aria-label="Закрыть">
+        <X className="size-4" />
+      </button>
+    </div>
+  );
+}
+
+function dropFromAlbum(home: AlbumHome, albumId: string, ids: string[]): AlbumHome {
+  const drop = new Set(ids);
+  return {
+    ...home,
+    photos: home.photos.map((photo) =>
+      drop.has(photo.id)
+        ? { ...photo, albumIds: photo.albumIds.filter((id) => id !== albumId) }
+        : photo,
+    ),
+    albums: home.albums.map((album) =>
+      album.id === albumId ? { ...album, ...albumAfterRemoval(album, ids) } : album,
+    ),
+  };
 }
 
 function Stripes() {

@@ -5,6 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   absoluteSignedUrl,
+  albumAfterRemoval,
   albumObjectPath,
   albumSpan,
   cleanTitle,
@@ -18,6 +19,7 @@ import {
   pathBelongsToPair,
   photoCountLabel,
   prepareStoredImage,
+  removalQuery,
   purgeDeadline,
   quotaLimitBytes,
   readCaptureDate,
@@ -123,6 +125,21 @@ test("a fresh signed url is kept until it is close to expiry", () => {
   assert.equal(mergeFreshUrls(prev, next, now)[0].thumbUrl, "old");
   const stale = [{ id: "a", thumbUrl: "old", expiresAt: now + 60 * 1000, takenAt: "x" }];
   assert.equal(mergeFreshUrls(stale, next, now)[0].thumbUrl, "new");
+});
+
+test("removing a photo from an album leaves it in all photos", () => {
+  const next = albumAfterRemoval({ photoIds: ["p1", "p2", "p3"], coverPhotoId: "p1" }, ["p1"]);
+  assert.deepEqual(next, { photoIds: ["p2", "p3"], coverPhotoId: "p2" });
+  const allPhotos = ["p1", "p2", "p3"];
+  assert.deepEqual(
+    allPhotos.filter((id) => !next.photoIds.includes(id)),
+    ["p1"],
+  );
+  const query = removalQuery("pair-1", "album-1", ["p1"]);
+  assert.match(query, /pair_id=eq\.pair-1/);
+  assert.match(query, /album_id=eq\.album-1/);
+  assert.match(query, /photo_id=in\.\("p1"\)/);
+  assert.equal(query.includes("app_album_photos"), false);
 });
 
 test("titles lose control characters", () => {

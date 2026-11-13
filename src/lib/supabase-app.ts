@@ -83,12 +83,30 @@ export async function sbPatch<T = Record<string, unknown>>(
 }
 
 export async function sbDelete(table: string, query: string) {
-  const { url } = serverConfig();
+  await sbDeleteReturning(table, query);
+}
+
+/**
+ * Delete and return the rows that actually went away.
+ * No JSON content-type: an empty JSON body makes PostgREST ignore the filter
+ * and answer 204 without deleting.
+ */
+export async function sbDeleteReturning<T>(table: string, query: string): Promise<T[]> {
+  const { url, key } = serverConfig();
   const res = await fetch(`${url}/rest/v1/${table}?${query}`, {
     method: "DELETE",
-    headers: headers(),
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Accept: "application/json",
+      Prefer: "return=representation",
+    },
   });
   if (!res.ok) return fail(res);
+  const text = await res.text();
+  if (!text) return [];
+  const parsed = JSON.parse(text) as T | T[];
+  return Array.isArray(parsed) ? parsed : [parsed];
 }
 
 export async function sbInsertMany(table: string, rows: Record<string, unknown>[]) {

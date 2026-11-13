@@ -5,6 +5,7 @@ import {
   MAX_FULL_BYTES,
   MAX_THUMB_BYTES,
   readCaptureDate,
+  sniffImage,
 } from "@/lib/album-model";
 import type { AlbumPhoto } from "@/lib/album-server";
 
@@ -21,6 +22,13 @@ export type PreparedUpload = {
 
 export async function prepareAlbumUpload(file: File): Promise<PreparedUpload> {
   const original = new Uint8Array(await file.arrayBuffer());
+  if (
+    !sniffImage(original) &&
+    !/^image\//i.test(file.type) &&
+    !looksLikeHeic(original, file.name, file.type)
+  ) {
+    throw new Error("Это не фото");
+  }
   const captured = readCaptureDate(original);
   const takenAt = captured ?? localStamp(new Date(file.lastModified || Date.now()));
   let blob: Blob = new Blob([original], { type: file.type || "application/octet-stream" });
@@ -153,6 +161,54 @@ async function encode(canvas: HTMLCanvasElement, maxBytes: number) {
   }
   if (!blob || blob.size > maxBytes) throw new Error("Файл слишком большой");
   return { blob, mime };
+}
+
+/**
+ * Save into Photos via the share sheet when the browser can share a file
+ * (iOS shows «Сохранить изображение»). Otherwise download a blob URL.
+ * Never assign location or click a remote href — WebKit would leave the app.
+ * Shared bytes are JPEG so Photos does not have to accept WebP.
+ */
+export async function saveAlbumPhoto(url: string) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Не удалось сохранить");
+  const file = await jpegFile(await response.blob(), "photo.jpg");
+  const nav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
+  if (typeof nav.canShare === "function" && nav.canShare({ files: [file] }) && navigator.share) {
+    try {
+      await navigator.share({ files: [file] });
+      return;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+    }
+  }
+  const objectUrl = URL.createObjectURL(file);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = file.name;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+}
+
+async function jpegFile(blob: Blob, name: string) {
+  if (blob.type === "image/jpeg") return new File([blob], name, { type: "image/jpeg" });
+  const bitmap = await createImageBitmap(blob);
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Не удалось сохранить");
+    ctx.drawImage(bitmap, 0, 0);
+    const jpeg = await toBlob(canvas, "image/jpeg", 0.92);
+    if (!jpeg) throw new Error("Не удалось сохранить");
+    return new File([jpeg], name, { type: "image/jpeg" });
+  } finally {
+    bitmap.close();
+  }
 }
 
 function toBlob(canvas: HTMLCanvasElement, mime: string, quality: number) {
