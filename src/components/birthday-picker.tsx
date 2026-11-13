@@ -198,7 +198,7 @@ export function BirthdayPicker({
         {step === "year" ? (
           <div
             ref={decadeRowRef}
-            className="mt-3 flex w-full shrink-0 gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="mt-3 flex w-full min-w-0 flex-wrap gap-2 px-5 pb-1"
             style={{
               paddingLeft: "max(1.25rem, env(safe-area-inset-left))",
               paddingRight: "max(1.25rem, env(safe-area-inset-right))",
@@ -212,7 +212,7 @@ export function BirthdayPicker({
                 onClick={() => setScrollYear(yearInDecade(decade, today))}
                 aria-pressed={decade === activeDecade}
                 aria-label={`Годы ${decade}-х`}
-                className={`shrink-0 rounded-full px-3.5 py-2 text-[14px] ${
+                className={`rounded-full px-3.5 py-2 text-[14px] ${
                   decade === activeDecade
                     ? "bg-cream font-semibold text-cream-fg"
                     : "bg-chip text-muted"

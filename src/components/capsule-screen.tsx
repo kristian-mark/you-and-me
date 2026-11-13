@@ -158,7 +158,7 @@ function WriteCapsule({ onClose }: { onClose: () => void }) {
   const ready = Boolean(title.trim() && body.trim() && opensAt);
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col px-5 pb-8">
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden px-5 pb-8">
       <div className="flex items-center justify-between pt-5">
         <button type="button" onClick={onClose} className="text-[17px] text-muted">
           Отмена
@@ -177,11 +177,11 @@ function WriteCapsule({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
-      <div className="mt-6 flex items-center justify-between rounded-[22px] bg-raised px-4 py-4">
+      <div className="mt-6 flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-[22px] bg-raised px-4 py-4">
         <span className="text-[16px] text-muted">Кому</span>
-        <span className="flex items-center gap-2">
+        <span className="flex min-w-0 max-w-full items-center gap-2">
           <span className={`size-3 shrink-0 rounded-full ${pieceBg(colors.partner)}`} />
-          <span className="min-w-0 truncate text-[16px]">{partnerName}</span>
+          <span className="min-w-0 break-words text-[16px]">{partnerName}</span>
         </span>
       </div>
 
@@ -196,7 +196,7 @@ function WriteCapsule({ onClose }: { onClose: () => void }) {
         </span>
       </button>
 
-      <div className="mt-3 flex gap-2 overflow-x-auto">
+      <div className="mt-3 flex min-w-0 flex-wrap gap-2">
         {(
           [
             ["anniversary", "Годовщина", presets.anniversary],
@@ -211,7 +211,7 @@ function WriteCapsule({ onClose }: { onClose: () => void }) {
               setPreset(id);
               setOpensAt(iso);
             }}
-            className={`shrink-0 rounded-full px-4 py-2 text-[14px] ${
+            className={`max-w-full rounded-full px-4 py-2 text-[14px] break-words ${
               preset === id ? "bg-cream text-cream-fg" : "bg-raised text-muted"
             }`}
           >

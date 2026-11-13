@@ -829,7 +829,7 @@ function AllTxs({
   };
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-28">
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-5 pb-28">
       <div className="relative flex items-center pt-5">
         <button type="button" onClick={onBack} className="relative z-10 -ml-1 px-1 py-2 text-muted">
           ‹ Бюджет
@@ -837,7 +837,7 @@ function AllTxs({
         <h1 className="pointer-events-none absolute inset-x-0 text-center text-[17px] font-semibold">Операции</h1>
       </div>
 
-      <div className="mt-5 flex gap-2">
+      <div className="mt-5 flex min-w-0 flex-wrap gap-2">
         {(
           [
             ["all", "Все"],
@@ -957,7 +957,7 @@ function TxForm({
   const symbol = CURRENCIES.find((c) => c.code === draft.currency)?.symbol ?? draft.currency;
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-28">
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-5 pb-28">
       <div className="flex items-center justify-between pt-5">
         <button type="button" onClick={onCancel} className="text-muted">
           Отмена
@@ -1000,7 +1000,7 @@ function TxForm({
               className={`flex min-w-0 items-center gap-2 rounded-2xl px-3 py-3 text-left ${draft.paidBy === "me" ? `ring-2 ${colors.me === "blue" ? "ring-blue" : "ring-pink"}` : "bg-[#2a2d36]"}`}
             >
               <span className={`size-2.5 shrink-0 rounded-full ${pieceBg(colors.me)}`} />
-              <span className="truncate text-[14px]">{myName}</span>
+              <span className="min-w-0 break-words text-[14px] leading-5">{myName}</span>
             </button>
             <button
               type="button"
@@ -1008,14 +1008,14 @@ function TxForm({
               className={`flex min-w-0 items-center gap-2 rounded-2xl px-3 py-3 text-left ${draft.paidBy === "partner" ? `ring-2 ${colors.partner === "blue" ? "ring-blue" : "ring-pink"}` : "bg-[#2a2d36]"}`}
             >
               <span className={`size-2.5 shrink-0 rounded-full ${pieceBg(colors.partner)}`} />
-              <span className="truncate text-[14px]">{partnerName}</span>
+              <span className="min-w-0 break-words text-[14px] leading-5">{partnerName}</span>
             </button>
           </div>
         </div>
       ) : null}
 
       <p className="mt-6 text-[12px] tracking-[0.14em] text-muted uppercase">категория</p>
-      <div className="mt-3 grid grid-cols-4 gap-y-4">
+      <div className="mt-3 grid min-w-0 grid-cols-3 gap-x-1 gap-y-4 sm:grid-cols-4">
         {preview.map((c) => (
           <CatBtn key={c.id} cat={c} active={draft.categoryId === c.id} onClick={() => onChange({ ...draft, categoryId: c.id })} />
         ))}
@@ -1053,23 +1053,24 @@ function TxForm({
           <span className="text-blue">{formatWhen(draft.date)}</span>
         </button>
         {kind === "expense" ? (
-          <div className="flex items-center justify-between border-t border-line py-3">
-            <span>Кто платил</span>
-            <div className="flex rounded-full bg-[#2a2d36] p-1">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-line py-3">
+            <span className="shrink-0">Кто платил</span>
+            <div className="flex max-w-full flex-wrap gap-1 rounded-[22px] bg-[#2a2d36] p-1">
               <button
                 type="button"
                 onClick={() => onChange({ ...draft, paidBy: "me" })}
-                className={`rounded-full px-3 py-1 text-[13px] ${draft.paidBy === "me" ? "bg-raised" : ""}`}
+                className={`inline-flex max-w-full items-center gap-1.5 rounded-full px-3 py-1 text-[13px] ${draft.paidBy === "me" ? "bg-raised" : ""}`}
               >
-                <span className={`mr-1 inline-block size-2 rounded-full ${pieceBg(colors.me)}`} />Я
+                <span className={`size-2 shrink-0 rounded-full ${pieceBg(colors.me)}`} />
+                Я
               </button>
               <button
                 type="button"
                 onClick={() => onChange({ ...draft, paidBy: "partner" })}
-                className={`max-w-[8rem] truncate rounded-full px-3 py-1 text-[13px] ${draft.paidBy === "partner" ? "bg-raised" : ""}`}
+                className={`inline-flex max-w-full items-center gap-1.5 rounded-full px-3 py-1 text-left text-[13px] ${draft.paidBy === "partner" ? "bg-raised" : ""}`}
               >
-                <span className={`mr-1 inline-block size-2 rounded-full ${pieceBg(colors.partner)}`} />
-                {partnerName.slice(0, 4)}
+                <span className={`size-2 shrink-0 rounded-full ${pieceBg(colors.partner)}`} />
+                <span className="break-words">{partnerName}</span>
               </button>
             </div>
           </div>
@@ -1205,14 +1206,14 @@ function CurrencyRow({
 function CatBtn({ cat, active, onClick }: { cat: BudgetCategory; active?: boolean; onClick: () => void }) {
   const Icon = ICONS[cat.icon] ?? MoreHorizontal;
   return (
-    <button type="button" onClick={onClick} className="flex flex-col items-center gap-1">
+    <button type="button" onClick={onClick} className="flex min-w-0 flex-col items-center gap-1">
       <span
         className={`grid size-14 place-items-center rounded-2xl ${active ? "ring-2 ring-white" : ""}`}
         style={{ background: cat.color }}
       >
         <Icon className="size-5 text-white/90" />
       </span>
-      <span className="max-w-[72px] truncate text-[12px] text-muted">{cat.title}</span>
+      <span className="w-full text-center text-[12px] leading-4 break-words text-muted">{cat.title}</span>
     </button>
   );
 }
@@ -1299,7 +1300,7 @@ function CategorySheet({
       <button type="button" onClick={onClose} className="absolute inset-0 bg-black/50" aria-label="Закрыть" />
       <div className="relative rounded-t-[28px] bg-[#1c1d22] px-5 pb-10 pt-3">
         <div className="mx-auto mb-5 h-1 w-12 rounded-full bg-line" />
-        <div className="grid grid-cols-4 gap-y-5">
+        <div className="grid min-w-0 grid-cols-3 gap-y-5 sm:grid-cols-4">
           {cats.map((c) => (
             <CatBtn key={c.id} cat={c} onClick={() => onPick(c.id)} />
           ))}
@@ -2542,7 +2543,7 @@ function RecurringForm({
   }
 
   return (
-    <section className="relative flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-28">
+    <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-5 pb-28">
       <div className="flex items-center justify-between pt-5">
         <button type="button" onClick={onCancel} className="text-muted">
           Отмена
@@ -2613,24 +2614,24 @@ function RecurringForm({
           <span>Счёт</span>
           <span className="text-muted">{acc?.title ?? "Без счёта"} ›</span>
         </button>
-        <div className="flex items-center justify-between border-t border-line px-4 py-3">
-          <span>{draft.kind === "income" ? "Получает" : "Платит"}</span>
-          <div className="flex rounded-full bg-[#14161b] p-1">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-line px-4 py-3">
+          <span className="shrink-0">{draft.kind === "income" ? "Получает" : "Платит"}</span>
+          <div className="flex max-w-full flex-wrap gap-1 rounded-[22px] bg-[#14161b] p-1">
             <button
               type="button"
               onClick={() => setDraft({ ...draft, paidBy: "me" })}
-              className={`rounded-full px-3 py-1 text-[13px] ${draft.paidBy === "me" ? "bg-[#2a2d36]" : "text-muted"}`}
+              className={`inline-flex max-w-full items-center gap-1.5 rounded-full px-3 py-1 text-[13px] ${draft.paidBy === "me" ? "bg-[#2a2d36]" : "text-muted"}`}
             >
-              <span className={`mr-1 inline-block size-2 rounded-full ${pieceBg(colors.me)}`} />
-              {myName.split(" ")[0]}
+              <span className={`size-2 shrink-0 rounded-full ${pieceBg(colors.me)}`} />
+              <span className="break-words">{myName}</span>
             </button>
             <button
               type="button"
               onClick={() => setDraft({ ...draft, paidBy: "partner" })}
-              className={`max-w-[7rem] truncate rounded-full px-3 py-1 text-[13px] ${draft.paidBy === "partner" ? "bg-[#2a2d36]" : "text-muted"}`}
+              className={`inline-flex max-w-full items-center gap-1.5 rounded-full px-3 py-1 text-left text-[13px] ${draft.paidBy === "partner" ? "bg-[#2a2d36]" : "text-muted"}`}
             >
-              <span className={`mr-1 inline-block size-2 rounded-full ${pieceBg(colors.partner)}`} />
-              {partnerName.split(" ")[0]}
+              <span className={`size-2 shrink-0 rounded-full ${pieceBg(colors.partner)}`} />
+              <span className="break-words">{partnerName}</span>
             </button>
           </div>
         </div>
@@ -2681,7 +2682,7 @@ function RecurringForm({
         <div className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={() => setSheet(null)}>
           <div className="w-full rounded-t-[28px] bg-[#1c1e24] px-5 pb-10 pt-3" onClick={(e) => e.stopPropagation()}>
             <div className="mx-auto h-1 w-10 rounded-full bg-white/20" />
-            <div className="mt-5 grid grid-cols-4 gap-4">
+            <div className="mt-5 grid min-w-0 grid-cols-3 gap-4 sm:grid-cols-4">
               {cats
                 .filter((c) => c.kind === draft.kind && !c.hidden)
                 .map((c) => (

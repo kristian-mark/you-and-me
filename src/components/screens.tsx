@@ -161,8 +161,8 @@ export function TasksScreen() {
           onAction={() => setSheet("new")}
         />
       ) : (
-        <div className="flex-1 overflow-y-auto px-5 pb-28">
-          <div className="flex gap-2 overflow-x-auto pb-4">
+        <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-5 pb-28">
+          <div className="flex min-w-0 flex-wrap gap-2 pb-4">
             {(
               [
                 ["all", `Все · ${counts.all}`],
@@ -175,7 +175,7 @@ export function TasksScreen() {
                 key={id}
                 type="button"
                 onClick={() => setFilter(id)}
-                className={`shrink-0 rounded-full px-3 py-2 text-[13px] ${
+                className={`max-w-full rounded-full px-3 py-2 text-[13px] break-words ${
                   filter === id ? "bg-cream text-cream-fg" : "bg-raised text-muted"
                 }`}
               >
@@ -640,7 +640,7 @@ function Chip({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full px-3 py-1 text-[12px] ${active ? on : "bg-chip text-muted"}`}
+      className={`max-w-full rounded-full px-3 py-1 text-left text-[12px] break-words ${active ? on : "bg-chip text-muted"}`}
     >
       {children}
     </button>
@@ -904,7 +904,7 @@ export function WishesScreen() {
   const partnerCount = wishes.filter((w) => who(w) === "partner" && !w.fulfilled).length;
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col">
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden">
       {selected ? (
         <WishDetail
           wish={selected}
@@ -914,7 +914,7 @@ export function WishesScreen() {
       ) : (
         <>
           <ScreenHeader title="Хотелки" onAdd={() => setSheet("new")} />
-          <div className="flex gap-2 overflow-x-auto px-5 pb-2">
+          <div className="flex min-w-0 flex-wrap gap-2 px-5 pb-2">
             <Chip tone="pink" active={filter === "partner"} onClick={() => setFilter("partner")}>
               {`${partnerName} · ${partnerCount}`}
             </Chip>
@@ -1302,7 +1302,7 @@ function ListDetail({ list, onBack }: { list: CheckList; onBack: () => void }) {
   };
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col px-5 pb-28">
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden px-5 pb-28">
       <header className="flex items-center justify-between pt-5">
         <button type="button" onClick={onBack} className="text-muted">
           ‹ Списки
@@ -1340,7 +1340,7 @@ function ListDetail({ list, onBack }: { list: CheckList; onBack: () => void }) {
           {done} из {total}
         </span>
       </div>
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex min-w-0 flex-wrap gap-2">
         {(
           [
             ["left", `Осталось · ${list.items.filter((i) => !i.done).length}`],
@@ -1352,7 +1352,7 @@ function ListDetail({ list, onBack }: { list: CheckList; onBack: () => void }) {
             key={id}
             type="button"
             onClick={() => setFilter(id)}
-            className={`rounded-full px-3 py-2 text-[13px] ${
+            className={`max-w-full rounded-full px-3 py-2 text-[13px] break-words ${
               filter === id ? "bg-chip text-fg" : "bg-raised text-muted"
             }`}
           >
