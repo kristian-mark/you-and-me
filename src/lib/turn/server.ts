@@ -32,6 +32,16 @@ import {
   type DotsState,
 } from "./dots.ts";
 import {
+  beginDurak,
+  idleDurakView,
+  newDurakMatch,
+  presentDurak,
+  readDurakState,
+  type DurakMatchView,
+  type DurakMove,
+  type DurakState,
+} from "./durak.ts";
+import {
   beginCheckers,
   idleCheckersView,
   newCheckersMatch,
@@ -363,6 +373,17 @@ const seaMatch = createMatch<SeaState, SeaMatchView>({
   apply: (snapshot, seat, move) => turnGames.sea.apply(snapshot, seat, move as SeaMove),
 });
 
+const durakMatch = createMatch<DurakState, DurakMatchView>({
+  game: turnGames.durak.type,
+  empty: () => turnGames.durak.empty(),
+  read: readDurakState,
+  begin: beginDurak,
+  reset: newDurakMatch,
+  present: presentDurak,
+  idle: idleDurakView,
+  apply: (snapshot, seat, move) => turnGames.durak.apply(snapshot, seat, move as DurakMove),
+});
+
 function parseVersion(value: unknown) {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 1_000_000_000) {
     throw new Error("Некорректная партия");
@@ -620,6 +641,51 @@ export const openNewSeaMatch = createServerFn({ method: "POST" })
   .handler(async ({ context, data }): Promise<SeaMatchView> => {
     try {
       return await seaMatch.open(context.userId, data.version);
+    } catch (error) {
+      textOf(error);
+    }
+  });
+
+export const loadDurakMatch = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }): Promise<DurakMatchView> => {
+    try {
+      return await durakMatch.load(context.userId);
+    } catch (error) {
+      textOf(error);
+    }
+  });
+
+export const playDurakMove = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: unknown) => {
+    if (!input || typeof input !== "object") throw new Error("Некорректный ход");
+    const raw = input as { kind?: unknown; index?: unknown; version?: unknown };
+    const version = parseVersion(raw.version);
+    if (raw.kind === "bito" || raw.kind === "take" || raw.kind === "finish") return { kind: raw.kind, version };
+    if (raw.kind === "play" && typeof raw.index === "number" && Number.isInteger(raw.index) && raw.index >= 0 && raw.index < 40) {
+      return { kind: "play" as const, index: raw.index, version };
+    }
+    throw new Error("Некорректный ход");
+  })
+  .handler(async ({ context, data }): Promise<DurakMatchView> => {
+    try {
+      const move = data.kind === "play" ? { kind: data.kind, index: data.index } : { kind: data.kind };
+      return await durakMatch.play(context.userId, move, data.version);
+    } catch (error) {
+      textOf(error);
+    }
+  });
+
+export const openNewDurakMatch = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: unknown) => {
+    if (!input || typeof input !== "object") throw new Error("Некорректная партия");
+    return { version: parseVersion((input as { version?: unknown }).version) };
+  })
+  .handler(async ({ context, data }): Promise<DurakMatchView> => {
+    try {
+      return await durakMatch.open(context.userId, data.version);
     } catch (error) {
       textOf(error);
     }

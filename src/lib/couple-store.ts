@@ -278,6 +278,7 @@ type CoupleState = {
   reversiNoted: string;
   checkersNoted: string;
   seaNoted: string;
+  durakNoted: string;
   budget: BudgetState;
   openTaskId: string | null;
   taskReturn: TabId | null;
@@ -363,6 +364,7 @@ type CoupleState = {
   noteReversi: (winner: "me" | "partner" | "draw", key: string) => void;
   noteCheckers: (winner: "me" | "partner" | "draw", key: string) => void;
   noteSea: (winner: "me" | "partner" | "draw", key: string) => void;
+  noteDurak: (winner: "me" | "partner" | "draw", key: string) => void;
   setBudgetCurrency: (code: string) => void;
   addBudgetTx: (input: Omit<BudgetTx, "id" | "createdAt">) => void;
   deleteBudgetTx: (id: string) => void;
@@ -506,6 +508,7 @@ function blankPersonal(ownerId: string | null): Partial<CoupleState> {
     reversiNoted: "",
     checkersNoted: "",
     seaNoted: "",
+    durakNoted: "",
     budget: {
       currency: "USD",
       txs: [],
@@ -576,7 +579,8 @@ export const useCouple = create<CoupleState>()(
       dotsNoted: "",
       reversiNoted: "",
       checkersNoted: "",
-    seaNoted: "",
+      seaNoted: "",
+      durakNoted: "",
       budget: {
         currency: "USD",
         txs: [],
@@ -1133,6 +1137,17 @@ export const useCouple = create<CoupleState>()(
               : { ...wins, partner: wins.partner + 2 };
         set({ gameWins: nextWins, seaNoted: key });
       },
+      noteDurak: (winner, key) => {
+        if (get().durakNoted === key) return;
+        const wins = get().gameWins ?? { me: 0, partner: 0 };
+        const nextWins =
+          winner === "draw"
+            ? { me: wins.me + 1, partner: wins.partner + 1 }
+            : winner === "me"
+              ? { ...wins, me: wins.me + 2 }
+              : { ...wins, partner: wins.partner + 2 };
+        set({ gameWins: nextWins, durakNoted: key });
+      },
       setBudgetCurrency: (code) => set({ budget: { ...get().budget, currency: code } }),
       addBudgetTx: (input) => {
         const budget = get().budget;
@@ -1283,6 +1298,7 @@ export const useCouple = create<CoupleState>()(
           reversiNoted: raw.reversiNoted ?? "",
           checkersNoted: raw.checkersNoted ?? "",
           seaNoted: raw.seaNoted ?? "",
+          durakNoted: raw.durakNoted ?? "",
           people: raw.people ?? [],
           gettingMarried: raw.gettingMarried ?? false,
           weddingDate: raw.weddingDate ?? "",

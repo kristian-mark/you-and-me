@@ -3,7 +3,7 @@ import { ChevronRight, Circle, Contrast, Grid3x3, Hash, Sailboat, Spade, Square 
 import { ConnectFourMatch } from "@/components/c4-screen";
 import { DotsMatch } from "@/components/dots-screen";
 import { CheckersMatch } from "@/components/checkers-screen";
-import { Durak } from "@/components/games-play";
+import { DurakMatch } from "@/components/durak-screen";
 import { SeaMatch } from "@/components/sea-screen";
 import { ReversiMatch } from "@/components/reversi-screen";
 import { TicTacToe } from "@/components/ttt-screen";
@@ -17,7 +17,7 @@ const GAMES = [
   { id: "reversi", title: "Реверси", icon: Contrast, Screen: ReversiMatch },
   { id: "checkers", title: "Шашки", icon: Circle, Screen: CheckersMatch },
   { id: "sea", title: "Морской бой", icon: Sailboat, Screen: SeaMatch },
-  { id: "durak", title: "Дурак", icon: Spade, Screen: Durak },
+  { id: "durak", title: "Дурак", icon: Spade, Screen: DurakMatch },
 ] as const;
 
 type GameId = (typeof GAMES)[number]["id"];
@@ -73,7 +73,7 @@ export function GamesScreen({ onBack }: { onBack: () => void }) {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[17px]">{item.title}</span>
-                <span className="block text-[13px] text-muted">{item.id === "ttt" || item.id === "c4" || item.id === "dots" || item.id === "reversi" || item.id === "checkers" || item.id === "sea" ? "По очереди, когда удобно" : "Новая игра"}</span>
+                <span className="block text-[13px] text-muted">По очереди, когда удобно</span>
               </span>
               <ChevronRight className="size-4 shrink-0 text-muted" />
             </button>
