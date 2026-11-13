@@ -1,6 +1,6 @@
 /**
- * Отмена / title / Готово. The title sits in a shrinkable middle column
- * so at 320px it truncates instead of covering the actions.
+ * Отмена / title / Готово. Actions keep their width. A normal title wraps
+ * onto a second line at 320px; only a very long title is clamped.
  */
 export function SheetHeader({
   title,
@@ -29,17 +29,19 @@ export function SheetHeader({
   pad?: boolean;
 }) {
   const tone = doneDisabled || doneMuted ? "text-muted" : doneTone === "fg" ? "text-fg" : "text-blue";
-  const side = "min-h-11 shrink-0 whitespace-nowrap text-[17px]";
+  const side = "min-h-11 shrink-0 whitespace-nowrap px-0.5 text-[16px] min-[400px]:text-[17px]";
   return (
     <header
-      className={`grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 ${pad ? "pt-5" : ""} pb-3 ${
-        flush ? "" : "px-4"
+      className={`grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 ${pad ? "pt-5" : ""} pb-3 ${
+        flush ? "" : "px-1"
       }`}
     >
       <button type="button" onClick={onCancel} className={`${side} text-left text-muted`}>
         {cancelLabel}
       </button>
-      <h2 className="min-w-0 truncate text-center text-[17px] font-semibold">{title}</h2>
+      <h2 className="line-clamp-2 min-w-0 text-center text-[15px] leading-tight font-semibold break-words min-[400px]:text-[17px]">
+        {title}
+      </h2>
       {onDone ? (
         <button type="button" onClick={onDone} disabled={doneDisabled} className={`${side} text-right ${tone}`}>
           {doneLabel}

@@ -225,7 +225,7 @@ export function DatePicker({
         aria-modal="true"
         aria-labelledby="date-picker-title"
         tabIndex={-1}
-        className="relative z-10 flex w-full max-w-md flex-col overflow-hidden rounded-t-[28px] bg-bg outline-none sm:rounded-[28px]"
+        className="relative z-10 flex min-h-0 w-full max-w-md flex-col overflow-hidden rounded-t-[28px] bg-bg outline-none sm:rounded-[28px]"
         style={{
           width: "min(100%, 28rem)",
           maxHeight: "min(92dvh, 720px)",
@@ -323,11 +323,10 @@ export function DatePicker({
 
         <div
           ref={scrollerRef}
-          className="mt-3 min-h-0 overflow-y-auto overscroll-contain px-3 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pt-1 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           style={{
-            maxHeight: "min(48dvh, 420px)",
-            paddingLeft: "max(0.75rem, env(safe-area-inset-left))",
-            paddingRight: "max(0.75rem, env(safe-area-inset-right))",
+            paddingLeft: "max(0.5rem, env(safe-area-inset-left))",
+            paddingRight: "max(0.5rem, env(safe-area-inset-right))",
           }}
         >
           {step === "year" ? (
@@ -388,7 +387,7 @@ export function DatePicker({
                   </span>
                 ))}
               </div>
-              <div className="mt-1 grid grid-cols-7">
+              <div className="mt-1 grid grid-cols-7 gap-y-1">
                 {Array.from({ length: pad }, (_, index) => (
                   <span key={`pad-${index}`} />
                 ))}
@@ -410,7 +409,8 @@ export function DatePicker({
                       onClick={() => chooseDay(iso)}
                       aria-pressed={selected}
                       aria-label={formatRuMonthTitle(birthday ? year! : shownYear, birthday ? month! : shownMonth) + ` ${day}`}
-                      className={`grid h-11 w-full place-items-center rounded-full text-[16px] ${
+                      style={{ height: "clamp(2.25rem, 6.2dvh, 2.75rem)" }}
+                      className={`grid w-full place-items-center rounded-full text-[16px] ${
                         selected
                           ? "bg-cream font-semibold text-cream-fg"
                           : disabled
