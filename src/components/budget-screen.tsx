@@ -943,6 +943,7 @@ function TxForm({
   const [moreOpen, setMoreOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [currencyOpen, setCurrencyOpen] = useState(false);
+  const colors = usePlayerColors();
   const amount = Number(draft.amount.replace(",", ".")) || 0;
   const ready = amount > 0 && Boolean(draft.categoryId);
   const preview =
@@ -996,17 +997,17 @@ function TxForm({
             <button
               type="button"
               onClick={() => onChange({ ...draft, paidBy: "me" })}
-              className={`flex items-center gap-2 rounded-2xl px-3 py-3 text-left ${draft.paidBy === "me" ? "ring-2 ring-blue" : "bg-[#2a2d36]"}`}
+              className={`flex min-w-0 items-center gap-2 rounded-2xl px-3 py-3 text-left ${draft.paidBy === "me" ? `ring-2 ${colors.me === "blue" ? "ring-blue" : "ring-pink"}` : "bg-[#2a2d36]"}`}
             >
-              <span className="size-2.5 shrink-0 rounded-full bg-blue" />
+              <span className={`size-2.5 shrink-0 rounded-full ${pieceBg(colors.me)}`} />
               <span className="truncate text-[14px]">{myName}</span>
             </button>
             <button
               type="button"
               onClick={() => onChange({ ...draft, paidBy: "partner" })}
-              className={`flex items-center gap-2 rounded-2xl px-3 py-3 text-left ${draft.paidBy === "partner" ? "ring-2 ring-pink" : "bg-[#2a2d36]"}`}
+              className={`flex min-w-0 items-center gap-2 rounded-2xl px-3 py-3 text-left ${draft.paidBy === "partner" ? `ring-2 ${colors.partner === "blue" ? "ring-blue" : "ring-pink"}` : "bg-[#2a2d36]"}`}
             >
-              <span className="size-2.5 shrink-0 rounded-full bg-pink" />
+              <span className={`size-2.5 shrink-0 rounded-full ${pieceBg(colors.partner)}`} />
               <span className="truncate text-[14px]">{partnerName}</span>
             </button>
           </div>
@@ -1060,14 +1061,14 @@ function TxForm({
                 onClick={() => onChange({ ...draft, paidBy: "me" })}
                 className={`rounded-full px-3 py-1 text-[13px] ${draft.paidBy === "me" ? "bg-raised" : ""}`}
               >
-                <span className="mr-1 inline-block size-2 rounded-full bg-blue" />Я
+                <span className={`mr-1 inline-block size-2 rounded-full ${pieceBg(colors.me)}`} />Я
               </button>
               <button
                 type="button"
                 onClick={() => onChange({ ...draft, paidBy: "partner" })}
-                className={`rounded-full px-3 py-1 text-[13px] ${draft.paidBy === "partner" ? "bg-raised" : ""}`}
+                className={`max-w-[8rem] truncate rounded-full px-3 py-1 text-[13px] ${draft.paidBy === "partner" ? "bg-raised" : ""}`}
               >
-                <span className="mr-1 inline-block size-2 rounded-full bg-pink" />
+                <span className={`mr-1 inline-block size-2 rounded-full ${pieceBg(colors.partner)}`} />
                 {partnerName.slice(0, 4)}
               </button>
             </div>
@@ -1433,6 +1434,7 @@ function Analytics({
 }) {
   const [openCat, setOpenCat] = useState<string | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
+  const colors = usePlayerColors();
   const [y, m] = month.split("-").map(Number);
   const monthTx = txs.filter((t) => t.date.startsWith(month));
   const spent = monthTx.filter((t) => t.kind === "expense").reduce((s, t) => s + toMain(t.amount, t.currency, main), 0);
@@ -1628,8 +1630,8 @@ function Analytics({
 
       <div className="mt-3 rounded-[22px] bg-raised px-4 py-4">
         <p className="text-[11px] tracking-[0.12em] text-muted uppercase">кто внёс · {MONTHS[m - 1]}</p>
-        <PersonBar name={myName} spend={meSpend} income={meIncome} total={spent} main={main} color="bg-blue" />
-        <PersonBar name={partnerName} spend={partnerSpend} income={partnerIncome} total={spent} main={main} color="bg-pink" />
+        <PersonBar name={myName} spend={meSpend} income={meIncome} total={spent} main={main} color={pieceBg(colors.me)} />
+        <PersonBar name={partnerName} spend={partnerSpend} income={partnerIncome} total={spent} main={main} color={pieceBg(colors.partner)} />
       </div>
     </section>
   );
@@ -1915,6 +1917,7 @@ function CategoriesLimits({
   onBack: () => void;
 }) {
   const [tab, setTab] = useState<"expense" | "income">("expense");
+  const colors = usePlayerColors();
   const [limitFor, setLimitFor] = useState<string | null>(null);
   const [editCat, setEditCat] = useState<BudgetCategory | null>(null);
   const [custom, setCustom] = useState<null | { title: string; kind: "expense" | "income"; icon: string; color: string; hidden: boolean }>(null);
@@ -2063,13 +2066,13 @@ function CategoriesLimits({
                     <span className="mt-1 block text-[13px] text-muted">
                       {meSum ? (
                         <span className="mr-3">
-                          <span className="mr-1 inline-block size-2 rounded-full bg-blue" />
+                          <span className={`mr-1 inline-block size-2 rounded-full ${pieceBg(colors.me)}`} />
                           {myName} · {money(meSum, currency)}
                         </span>
                       ) : null}
                       {partnerSum ? (
                         <span>
-                          <span className="mr-1 inline-block size-2 rounded-full bg-pink" />
+                          <span className={`mr-1 inline-block size-2 rounded-full ${pieceBg(colors.partner)}`} />
                           {partnerName} · {money(partnerSum, currency)}
                         </span>
                       ) : null}
@@ -2509,6 +2512,7 @@ function RecurringForm({
 }) {
   const [draft, setDraft] = useState(initial);
   const [sheet, setSheet] = useState<"cat" | "acc" | "repeat" | "ccy" | "time" | null>(null);
+  const colors = usePlayerColors();
   const cat = cats.find((c) => c.id === draft.categoryId);
   const acc = accounts.find((a) => a.id === draft.accountId);
   const symbol = CURRENCIES.find((c) => c.code === draft.currency)?.symbol ?? draft.currency;
@@ -2617,15 +2621,15 @@ function RecurringForm({
               onClick={() => setDraft({ ...draft, paidBy: "me" })}
               className={`rounded-full px-3 py-1 text-[13px] ${draft.paidBy === "me" ? "bg-[#2a2d36]" : "text-muted"}`}
             >
-              <span className="mr-1 inline-block size-2 rounded-full bg-blue" />
+              <span className={`mr-1 inline-block size-2 rounded-full ${pieceBg(colors.me)}`} />
               {myName.split(" ")[0]}
             </button>
             <button
               type="button"
               onClick={() => setDraft({ ...draft, paidBy: "partner" })}
-              className={`rounded-full px-3 py-1 text-[13px] ${draft.paidBy === "partner" ? "bg-[#2a2d36]" : "text-muted"}`}
+              className={`max-w-[7rem] truncate rounded-full px-3 py-1 text-[13px] ${draft.paidBy === "partner" ? "bg-[#2a2d36]" : "text-muted"}`}
             >
-              <span className="mr-1 inline-block size-2 rounded-full bg-pink" />
+              <span className={`mr-1 inline-block size-2 rounded-full ${pieceBg(colors.partner)}`} />
               {partnerName.split(" ")[0]}
             </button>
           </div>

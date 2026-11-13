@@ -2,56 +2,84 @@ import { useEffect, useState } from "react";
 import { ChevronRight, Mail } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
-import { useCouple } from "@/lib/couple-store";
+import { useCouple, usePlayerColors } from "@/lib/couple-store";
 import { questionById } from "@/lib/daily-questions";
+import { refreshCoupleDaily, skipSharedDaily } from "@/lib/daily-live";
+import { pieceBg, pieceText, type PieceColor } from "@/lib/pair-color";
+import { LIST_POLL_MS, useScreenPoll } from "@/lib/screen-poll";
+
+function stamp(iso: string | undefined) {
+  if (!iso) return "";
+  const date = parseISO(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return format(date, "d MMM в HH:mm", { locale: ru });
+}
+
+function toneWash(color: PieceColor) {
+  return color === "blue" ? "bg-[#1a3a52] text-blue" : "bg-[#3d2433] text-pink";
+}
 
 export function QuestionDayScreen({ onBack }: { onBack: () => void }) {
   const daily = useCouple((s) => s.daily);
   const ensureDaily = useCouple((s) => s.ensureDaily);
   const [past, setPast] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     ensureDaily();
   }, [ensureDaily]);
 
+  useScreenPoll("daily", true, LIST_POLL_MS, async () => {
+    await refreshCoupleDaily();
+    setError("");
+  });
+
   if (past) return <PastList onBack={() => setPast(false)} />;
 
   const q = questionById(daily.questionId);
-  const dateLabel = daily.date
-    ? format(parseISO(daily.date), "d MMMM", { locale: ru })
-    : "";
+  const dateLabel = daily.date ? format(parseISO(daily.date), "d MMMM", { locale: ru }) : "";
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col px-5 pb-28">
-      <button type="button" onClick={onBack} className="pt-5 text-left text-[17px] text-muted">
+    <section className="flex min-h-0 flex-1 flex-col overflow-x-hidden px-5 pb-28">
+      <button type="button" onClick={onBack} className="min-h-11 pt-5 text-left text-[17px] text-muted">
         ‹ Ещё
       </button>
       <p className="mt-6 text-[12px] tracking-[0.14em] text-muted uppercase">
         {dateLabel} · тема: {q.topic}
       </p>
-      <h1 className="mt-3 text-[32px] font-semibold leading-9">{q.text}</h1>
+      <h1 className="mt-3 text-[28px] font-semibold leading-8 break-words sm:text-[32px] sm:leading-9">{q.text}</h1>
 
       {daily.myAnswer ? (
         <Waiting onPast={() => setPast(true)} />
       ) : (
-        <Compose onPast={() => setPast(true)} />
+        <Compose error={error} onError={setError} onPast={() => setPast(true)} />
       )}
     </section>
   );
 }
 
-function Compose({ onPast }: { onPast: () => void }) {
+function Compose({
+  error,
+  onError,
+  onPast,
+}: {
+  error: string;
+  onError: (value: string) => void;
+  onPast: () => void;
+}) {
   const partnerName = useCouple((s) => s.partnerName);
+  const partnerAnswered = useCouple((s) => s.daily.partnerAnswered);
   const answerDaily = useCouple((s) => s.answerDaily);
-  const skipDaily = useCouple((s) => s.skipDaily);
-  const history = useCouple((s) => s.daily.history);
+  const history = useCouple((s) => s.daily.history) ?? [];
+  const colors = usePlayerColors();
   const [text, setText] = useState("");
   const [confirmSkip, setConfirmSkip] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   return (
     <>
-      <div className="relative mt-6 rounded-[22px] bg-raised px-4 pb-4 pt-3 ring-1 ring-blue/70">
-        <span className="absolute bottom-4 left-0 top-4 w-[3px] rounded-full bg-blue" />
+      <div className={`relative mt-6 rounded-[22px] bg-raised px-4 pb-4 pt-3 ring-1 ${colors.me === "blue" ? "ring-blue/70" : "ring-pink/70"}`}>
+        <span className={`absolute bottom-4 left-0 top-4 w-[3px] rounded-full ${pieceBg(colors.me)}`} />
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -59,19 +87,31 @@ function Compose({ onPast }: { onPast: () => void }) {
           placeholder="Своими словами. Хватит пары предложений, но если пошло — пиши сколько идёт."
           className="w-full resize-none bg-transparent pl-2 text-[16px] leading-6 outline-none placeholder:text-muted"
         />
-        <p className="mt-2 pl-2 text-[13px] leading-5 text-muted">
-          {partnerName} увидит ответ только когда ответит тоже
+        <p className="mt-2 pl-2 text-[13px] leading-5 break-words text-muted">
+          {partnerAnswered
+            ? `Ответ ${partnerName} уже есть. Он откроется, когда отправишь свой.`
+            : `${partnerName} увидит ответ только когда ответит тоже`}
         </p>
       </div>
       <button
         type="button"
-        disabled={!text.trim()}
-        onClick={() => answerDaily(text)}
-        className="mt-4 w-full rounded-full bg-[#1a3a52] py-4 text-[17px] font-semibold text-blue disabled:opacity-40"
+        disabled={!text.trim() || busy}
+        onClick={() => {
+          setBusy(true);
+          onError("");
+          answerDaily(text);
+          void refreshCoupleDaily()
+            .catch((err: unknown) => {
+              onError(err instanceof Error ? err.message : "Не вышло отправить");
+            })
+            .finally(() => setBusy(false));
+        }}
+        className={`mt-4 min-h-11 w-full rounded-full py-4 text-[17px] font-semibold disabled:opacity-40 ${toneWash(colors.me)}`}
       >
         Отправить ответ
       </button>
       <p className="mt-3 text-center text-[13px] text-muted">После отправки ответ не переписать</p>
+      {error ? <p className="mt-2 text-center text-[13px] text-pink">{error}</p> : null}
 
       <div className="mt-8 border-t border-line pt-5">
         <p className="text-[16px]">Пропустить вопрос</p>
@@ -82,44 +122,37 @@ function Compose({ onPast }: { onPast: () => void }) {
           <div className="mt-3 flex gap-2">
             <button
               type="button"
+              disabled={busy}
               onClick={() => {
-                skipDaily();
-                setConfirmSkip(false);
+                setBusy(true);
+                onError("");
+                void skipSharedDaily()
+                  .then(() => setConfirmSkip(false))
+                  .catch((err: unknown) => {
+                    onError(err instanceof Error ? err.message : "Не вышло пропустить");
+                  })
+                  .finally(() => setBusy(false));
               }}
-              className="flex-1 rounded-full bg-raised py-3 text-sm"
+              className="min-h-11 flex-1 rounded-full bg-raised py-3 text-sm"
             >
               Да, пропустить
             </button>
             <button
               type="button"
               onClick={() => setConfirmSkip(false)}
-              className="flex-1 rounded-full bg-raised py-3 text-sm text-muted"
+              className="min-h-11 flex-1 rounded-full bg-raised py-3 text-sm text-muted"
             >
               Оставить
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setConfirmSkip(true)}
-            className="mt-3 text-[15px] text-muted"
-          >
+          <button type="button" onClick={() => setConfirmSkip(true)} className="mt-3 min-h-11 text-[15px] text-muted">
             Пропустить
           </button>
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={onPast}
-        className="mt-6 flex w-full items-center justify-between rounded-[22px] bg-raised px-4 py-4"
-      >
-        <span>Прошлые вопросы</span>
-        <span className="flex items-center gap-2 text-muted">
-          {history.length}
-          <ChevronRight className="size-4" />
-        </span>
-      </button>
+      <PastButton count={history.length} onPast={onPast} />
     </>
   );
 }
@@ -127,51 +160,38 @@ function Compose({ onPast }: { onPast: () => void }) {
 function Waiting({ onPast }: { onPast: () => void }) {
   const daily = useCouple((s) => s.daily);
   const partnerName = useCouple((s) => s.partnerName);
-  const answerDaily = useCouple((s) => s.answerDaily);
+  const colors = usePlayerColors();
   const history = daily.history ?? [];
   const both = Boolean(daily.myAnswer && daily.partnerAnswer);
 
   return (
     <>
-      <article className="relative mt-6 rounded-[22px] bg-raised px-5 py-4">
-        <span className="absolute bottom-4 left-0 top-4 w-[3px] rounded-full bg-blue" />
-        <div className="flex items-center justify-between pl-2">
-          <p className="text-[11px] tracking-[0.14em] text-blue uppercase">твой ответ</p>
-          <p className="text-[13px] text-muted">
-            {daily.myAt ? format(parseISO(daily.myAt), "d MMM в HH:mm", { locale: ru }) : ""}
-          </p>
-        </div>
-        <p className="mt-2 pl-2 text-[16px] leading-6">{daily.myAnswer}</p>
-      </article>
+      <AnswerCard
+        color={colors.me}
+        label="твой ответ"
+        at={daily.myAt}
+        body={daily.myAnswer ?? ""}
+      />
 
       {both ? (
-        <article className="relative mt-3 rounded-[22px] bg-raised px-5 py-4">
-          <span className="absolute bottom-4 left-0 top-4 w-[3px] rounded-full bg-pink" />
-          <div className="flex items-center justify-between pl-2">
-            <p className="text-[11px] tracking-[0.14em] text-pink uppercase">ответ {partnerName}</p>
-            <p className="text-[13px] text-muted">
-              {daily.partnerAt ? format(parseISO(daily.partnerAt), "d MMM в HH:mm", { locale: ru }) : ""}
-            </p>
-          </div>
-          <p className="mt-2 pl-2 text-[16px] leading-6">{daily.partnerAnswer}</p>
-        </article>
+        <AnswerCard
+          color={colors.partner}
+          label={`ответ ${partnerName}`}
+          at={daily.partnerAt}
+          body={daily.partnerAnswer ?? ""}
+          className="mt-3"
+        />
       ) : (
         <article className="mt-3 rounded-[22px] bg-raised px-5 py-5">
-          <p className="flex items-center gap-2 text-[16px] font-medium">
-            <Mail className="size-5 text-muted" />
+          <p className="flex items-center gap-2 text-[16px] font-medium break-words">
+            <Mail className="size-5 shrink-0 text-muted" />
             Ход {partnerName}
           </p>
           <p className="mt-2 text-[14px] leading-5 text-muted">
-            Ответы откроются вам обоим, как только {partnerName} напишет свой. Не торопи —
-            вопрос подождёт.
+            {daily.partnerAnswered
+              ? `Ответ ${partnerName} уже есть. Откроем оба, как только твой дойдёт.`
+              : `Ответы откроются вам обоим, как только ${partnerName} напишет свой. Не торопи — вопрос подождёт.`}
           </p>
-          <button
-            type="button"
-            onClick={() => answerDaily("Я тоже это помню. Напишу нормально со своего телефона.", "partner")}
-            className="mt-3 text-left text-[13px] text-muted"
-          >
-            Партнёр уже ответил — открыть
-          </button>
         </article>
       )}
 
@@ -179,26 +199,59 @@ function Waiting({ onPast }: { onPast: () => void }) {
         Свой ответ уже не переписать. Новый вопрос придёт, когда закроется этот.
       </p>
 
-      <button
-        type="button"
-        onClick={onPast}
-        className="mt-6 flex w-full items-center justify-between rounded-[22px] bg-raised px-4 py-4"
-      >
-        <span>Прошлые вопросы</span>
-        <span className="flex items-center gap-2 text-muted">
-          {history.length}
-          <ChevronRight className="size-4" />
-        </span>
-      </button>
+      <PastButton count={history.length} onPast={onPast} />
     </>
   );
 }
 
-function PastList({ onBack }: { onBack: () => void }) {
-  const history = useCouple((s) => s.daily.history);
+function AnswerCard({
+  color,
+  label,
+  at,
+  body,
+  className = "mt-6",
+}: {
+  color: PieceColor;
+  label: string;
+  at?: string;
+  body: string;
+  className?: string;
+}) {
   return (
-    <section className="flex min-h-0 flex-1 flex-col px-5 pb-28">
-      <button type="button" onClick={onBack} className="pt-5 text-left text-[17px] text-muted">
+    <article className={`relative rounded-[22px] bg-raised px-5 py-4 ${className}`}>
+      <span className={`absolute bottom-4 left-0 top-4 w-[3px] rounded-full ${pieceBg(color)}`} />
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 pl-2">
+        <p className={`min-w-0 text-[11px] tracking-[0.14em] break-words uppercase ${pieceText(color)}`}>{label}</p>
+        <p className="text-[13px] text-muted">{stamp(at)}</p>
+      </div>
+      <p className="mt-2 pl-2 text-[16px] leading-6 break-words">{body}</p>
+    </article>
+  );
+}
+
+function PastButton({ count, onPast }: { count: number; onPast: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onPast}
+      className="mt-6 flex min-h-11 w-full items-center justify-between gap-3 rounded-[22px] bg-raised px-4 py-4"
+    >
+      <span className="min-w-0">Прошлые вопросы</span>
+      <span className="flex shrink-0 items-center gap-2 text-muted">
+        {count}
+        <ChevronRight className="size-4" />
+      </span>
+    </button>
+  );
+}
+
+function PastList({ onBack }: { onBack: () => void }) {
+  const history = useCouple((s) => s.daily.history) ?? [];
+  const partnerName = useCouple((s) => s.partnerName);
+  const colors = usePlayerColors();
+  return (
+    <section className="flex min-h-0 flex-1 flex-col overflow-x-hidden px-5 pb-28">
+      <button type="button" onClick={onBack} className="min-h-11 pt-5 text-left text-[17px] text-muted">
         ‹ Вопрос дня
       </button>
       <h1 className="mt-5 text-[32px] font-semibold">Прошлые вопросы</h1>
@@ -211,10 +264,14 @@ function PastList({ onBack }: { onBack: () => void }) {
               <p className="text-[12px] tracking-[0.12em] text-muted uppercase">
                 {format(parseISO(item.date), "d MMMM", { locale: ru })} · {item.topic}
               </p>
-              <p className="mt-2 text-[17px] font-medium leading-6">{item.text}</p>
-              {item.myAnswer ? <p className="mt-3 text-[14px] text-muted">Ты: {item.myAnswer}</p> : null}
+              <p className="mt-2 text-[17px] font-medium leading-6 break-words">{item.text}</p>
+              {item.myAnswer ? (
+                <p className={`mt-3 text-[14px] break-words ${pieceText(colors.me)}`}>Ты: {item.myAnswer}</p>
+              ) : null}
               {item.partnerAnswer ? (
-                <p className="mt-1 text-[14px] text-muted">Партнёр: {item.partnerAnswer}</p>
+                <p className={`mt-1 text-[14px] break-words ${pieceText(colors.partner)}`}>
+                  {partnerName}: {item.partnerAnswer}
+                </p>
               ) : null}
             </li>
           ))}

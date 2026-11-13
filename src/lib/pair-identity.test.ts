@@ -23,6 +23,12 @@ test("a saved display name is kept even when it matches the old demo", () => {
   assert.equal(profileName(DEMO_MY_NAME, "k@example.com", FALLBACK_MY_NAME), DEMO_MY_NAME);
 });
 
+test("a saved name beats the mailbox handle, which is only the fallback", () => {
+  assert.equal(profileName("Алина", "alinagiljardi", FALLBACK_PARTNER_NAME), "Алина");
+  assert.equal(profileName(null, "alinagiljardi", FALLBACK_PARTNER_NAME), "alinagiljardi");
+  assert.equal(profileName("Кристианс", "zaluckijm@gmail.com", FALLBACK_MY_NAME), "Кристианс");
+});
+
 test("stored demo names and the 2021 anniversary are dropped", () => {
   const clean = scrubStoredCouple({
     myName: DEMO_MY_NAME,

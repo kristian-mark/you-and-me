@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, Circle, Hourglass } from "lucide-react";
-import { useCouple, type VotePoll } from "@/lib/couple-store";
+import { useCouple, usePlayerColors, type VotePoll } from "@/lib/couple-store";
+import { pieceBg, pieceText } from "@/lib/pair-color";
 
 export function VotingScreen({ onBack }: { onBack: () => void }) {
   const votes = useCouple((s) => s.votes);
@@ -142,6 +143,7 @@ function VoteDetail({ vote, onBack }: { vote: VotePoll; onBack: () => void }) {
   const castVote = useCouple((s) => s.castVote);
   const [pick, setPick] = useState(vote.myChoice ?? "");
   const revealed = Boolean(vote.myChoice && vote.partnerChoice);
+  const colors = usePlayerColors();
   const myLabel = vote.options.find((o) => o.id === vote.myChoice)?.text;
   const partnerLabel = vote.options.find((o) => o.id === vote.partnerChoice)?.text;
 
@@ -154,34 +156,34 @@ function VoteDetail({ vote, onBack }: { vote: VotePoll; onBack: () => void }) {
         <h1 className="mt-6 text-[32px] font-semibold leading-9">{vote.question}</h1>
 
         <div className="mt-6 grid grid-cols-2 gap-3">
-          <div className="rounded-[22px] bg-raised p-4">
-            <div className="h-1 -mx-4 -mt-4 mb-4 rounded-t-[22px] bg-blue" />
+          <div className="min-w-0 rounded-[22px] bg-raised p-4">
+            <div className={`h-1 -mx-4 -mt-4 mb-4 rounded-t-[22px] ${pieceBg(colors.me)}`} />
             <p className="flex items-center gap-2 text-[14px] text-muted">
-              <span className="size-3 rounded-full bg-blue" />
+              <span className={`size-3 rounded-full ${pieceBg(colors.me)}`} />
               ты
             </p>
             <p className="mt-3 text-[18px] font-medium">{revealed || vote.myChoice ? myLabel : "· · ·"}</p>
-            <p className="mt-4 text-[12px] font-semibold tracking-[0.08em] text-blue uppercase">
-              проголосовал
+            <p className={`mt-4 text-[12px] font-semibold tracking-[0.08em] uppercase ${pieceText(colors.me)}`}>
+              готово
             </p>
           </div>
           <div
-            className={`rounded-[22px] p-4 ${
+            className={`min-w-0 rounded-[22px] p-4 ${
               vote.partnerChoice ? "bg-raised" : "border border-dashed border-line bg-transparent"
             }`}
           >
             {vote.partnerChoice ? (
-              <div className="h-1 -mx-4 -mt-4 mb-4 rounded-t-[22px] bg-pink" />
+              <div className={`h-1 -mx-4 -mt-4 mb-4 rounded-t-[22px] ${pieceBg(colors.partner)}`} />
             ) : null}
-            <p className="flex items-center gap-2 text-[14px] text-muted">
-              <span className="size-3 rounded-full bg-pink" />
-              {partnerName}
+            <p className="flex min-w-0 items-center gap-2 text-[14px] text-muted">
+              <span className={`size-3 shrink-0 rounded-full ${pieceBg(colors.partner)}`} />
+              <span className="truncate">{partnerName}</span>
             </p>
             {vote.partnerChoice ? (
               <>
                 <p className="mt-3 text-[18px] font-medium">{revealed ? partnerLabel : "· · ·"}</p>
-                <p className="mt-4 text-[12px] font-semibold tracking-[0.08em] text-pink uppercase">
-                  проголосовала
+                <p className={`mt-4 text-[12px] font-semibold tracking-[0.08em] uppercase ${pieceText(colors.partner)}`}>
+                  готово
                 </p>
               </>
             ) : (
