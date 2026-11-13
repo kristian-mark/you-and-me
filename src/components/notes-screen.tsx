@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Check, Folder, FolderMinus, Plus, Search } from "lucide-react";
+import { InChatRow } from "@/components/in-chat-row";
 import { SheetHeader } from "@/components/sheet-header";
 import { EmptyState, UsBadge } from "@/components/ui/shell";
-import { formatRuNoteStamp } from "@/lib/dates";
+import { shareToChat, useOpenChatTarget } from "@/lib/chat-nav";
 import { useCouple, usePlayerColors, type Note } from "@/lib/couple-store";
+import { formatRuNoteStamp } from "@/lib/dates";
 import { pieceText } from "@/lib/pair-color";
 
 const FOLDER_COLORS = ["#e58aae", "#4aa3e8", "#2cb5b0", "#5dce8a", "#8b8b92"];
@@ -15,6 +17,7 @@ export function NotesScreen({ onBack }: { onBack: () => void }) {
   const [folderView, setFolderView] = useState<string | "all" | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [newFolder, setNewFolder] = useState(false);
+  useOpenChatTarget("note", (target) => setOpenId(target.id));
   const [query, setQuery] = useState("");
   const selected = notes.find((n) => n.id === openId);
 
@@ -291,6 +294,9 @@ function NoteDetail({
         </div>
       ) : null}
       {note.body ? <p className="mt-6 whitespace-pre-wrap text-[16px] leading-relaxed">{note.body}</p> : null}
+      <InChatRow
+        onSend={() => shareToChat({ kind: "note", id: note.id, title: note.title || "Заметка", subtitle: folder?.title ?? "" })}
+      />
     </section>
   );
 }

@@ -6,6 +6,7 @@ import {
   Download,
   Heart,
   ImagePlus,
+  MessageCircle,
   MoreHorizontal,
   Plus,
   Trash2,
@@ -41,6 +42,7 @@ import {
   type TrashPhoto,
 } from "@/lib/album-server";
 import { SheetHeader } from "@/components/sheet-header";
+import { shareToChat } from "@/lib/chat-nav";
 import { useCouple, usePlayerColors } from "@/lib/couple-store";
 import { pieceBg, pieceText } from "@/lib/pair-color";
 import { LIST_POLL_MS, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
@@ -92,6 +94,20 @@ export function AlbumScreen({ onBack }: { onBack: () => void }) {
 
   const album = home?.albums.find((item) => item.id === albumId) ?? null;
   const photos = home?.photos ?? [];
+  const chatTarget = useCouple((s) => s.chatTarget);
+
+  useEffect(() => {
+    if (!chatTarget || (chatTarget.kind !== "photo" && chatTarget.kind !== "album") || !home) return;
+    if (chatTarget.kind === "album" && home.albums.some((item) => item.id === chatTarget.id)) {
+      setPage("album");
+      setAlbumId(chatTarget.id);
+    }
+    if (chatTarget.kind === "photo" && home.photos.some((photo) => photo.id === chatTarget.id)) {
+      const ids = home.photos.map((photo) => photo.id);
+      setViewer({ ids, index: Math.max(0, ids.indexOf(chatTarget.id)) });
+    }
+    useCouple.getState().setChatTarget(null);
+  }, [chatTarget, home]);
 
   useEffect(() => {
     if (!home) return;
@@ -314,6 +330,24 @@ export function AlbumScreen({ onBack }: { onBack: () => void }) {
                   setMenu(false);
                 })
               }
+            />
+            <MenuButton
+              label="В чат"
+              onClick={() => {
+                void shareToChat({
+                  kind: "album",
+                  id: album.id,
+                  title: album.title,
+                  subtitle: photoCountLabel(albumPhotos.length),
+                })
+                  .then(() => {
+                    setMenu(false);
+                    setError("Отправлено в чат");
+                  })
+                  .catch((err: unknown) =>
+                    setError(err instanceof Error ? err.message : "Не ушло"),
+                  );
+              }}
             />
             <MenuButton
               label="Сменить обложку"
@@ -869,6 +903,16 @@ export function AlbumScreen({ onBack }: { onBack: () => void }) {
               setViewer(null);
             })
           }
+          onChat={() =>
+            void shareToChat({
+              kind: "photo",
+              id: current.id,
+              title: "Фото",
+              subtitle: viewerStamp(current.takenAt),
+            })
+              .then(() => setError("Отправлено в чат"))
+              .catch((err: unknown) => setError(err instanceof Error ? err.message : "Не ушло"))
+          }
         />
       ) : null}
     </section>
@@ -1169,6 +1213,7 @@ function Viewer({
   onSave,
   onAlbum,
   onDelete,
+  onChat,
 }: {
   photo: AlbumPhoto;
   index: number;
@@ -1181,6 +1226,7 @@ function Viewer({
   onSave: () => void;
   onAlbum: () => void;
   onDelete: () => void;
+  onChat: () => void;
 }) {
   const [full, setFull] = useState("");
   const startX = useRef(0);
@@ -1264,7 +1310,14 @@ function Viewer({
         {photo.likedByPartner && !photo.likedByMe ? (
           <p className={`mt-1 text-[13px] ${pieceText(colors.partner)}`}>нравится партнёру</p>
         ) : null}
-        <div className="mt-4 grid grid-cols-4 text-center text-[12px] text-white/80">
+        <button
+          type="button"
+          onClick={onChat}
+          className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-white/10 text-[15px]"
+        >
+          <MessageCircle className="size-4" /> В чат
+        </button>
+        <div className="mt-3 grid grid-cols-4 text-center text-[12px] text-white/80">
           <button
             type="button"
             onClick={onLike}

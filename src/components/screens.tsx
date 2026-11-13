@@ -34,6 +34,8 @@ import {
   Wallet,
 } from "lucide-react";
 import { AlbumScreen } from "@/components/album-screen";
+import { ChatScreen } from "@/components/chat-screen";
+import { InChatRow } from "@/components/in-chat-row";
 import { NewListSheet } from "@/components/new-list-sheet";
 import { NotesScreen } from "@/components/notes-screen";
 import { GiftRadarScreen } from "@/components/gift-radar-screen";
@@ -51,6 +53,8 @@ import { PairCode } from "@/components/pair-code";
 import { SheetHeader } from "@/components/sheet-header";
 import { EmptyState, ScreenHeader, UsBadge } from "@/components/ui/shell";
 import { WishPhoto } from "@/components/wish-photo";
+import { badgeLabel } from "@/lib/chat-model";
+import { shareToChat, useOpenChatTarget } from "@/lib/chat-nav";
 import { useCouple, usePlayerColors, viewedOwner, viewedWishOwner, type CheckList, type Task, type TaskOwner, type Wish } from "@/lib/couple-store";
 import { capitalRu, formatRuDay, formatRuWeekday, RU_MONTHS, toIsoDate } from "@/lib/dates";
 import { pieceBg, pieceCss, type PieceColor } from "@/lib/pair-color";
@@ -89,6 +93,7 @@ export function TasksScreen() {
   const [sheet, setSheet] = useState<"new" | Task | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "mine" | "partner" | "open">("all");
+  useOpenChatTarget("task", (target) => openTask(target.id));
 
   const ownerOf = (task: Task) => viewedOwner(task, myUserId);
 
@@ -532,11 +537,16 @@ function TaskDetail({
         {task.note?.trim() ? task.note : <span className="text-muted">Нет заметки</span>}
       </div>
 
-      <button type="button" className="mt-3 flex w-full items-center gap-3 rounded-2xl bg-raised px-4 py-4">
-        <MessageCircle className="size-5" />
-        <span className="flex-1 text-left">В чат</span>
-        <ChevronRight className="size-4 text-muted" />
-      </button>
+      <InChatRow
+        onSend={() =>
+          shareToChat({
+            kind: "task",
+            id: task.id,
+            title: task.title,
+            subtitle: task.dueDate ?? "",
+          })
+        }
+      />
 
       {free ? (
         <>
@@ -650,6 +660,10 @@ export function CalendarScreen() {
   const addEvent = useCouple((s) => s.addEvent);
   const openTask = useCouple((s) => s.openTask);
   const setTab = useCouple((s) => s.setTab);
+  const [shared, setShared] = useState("");
+  useOpenChatTarget("event", (target) => {
+    if (target.date) setSelected(target.date);
+  });
 
   const days = useMemo(() => {
     const start = startOfWeek(startOfMonth(cursor), { weekStartsOn: 0 });
@@ -674,6 +688,8 @@ export function CalendarScreen() {
         .filter((i) => i.date)
         .map((i) => ({
           id: i.id,
+          listId: list.id,
+          listTitle: list.title,
           title: i.text,
           date: i.date as string,
           kind: "list" as const,
@@ -708,6 +724,21 @@ export function CalendarScreen() {
     addEvent(title, date);
     setComposer(false);
   };
+
+  async function shareCalendarItem(item: (typeof calendarItems)[number]) {
+    try {
+      if (item.kind === "task") {
+        await shareToChat({ kind: "task", id: item.id, title: item.title, subtitle: item.date });
+      } else if (item.kind === "list") {
+        await shareToChat({ kind: "list", id: item.listId, title: item.listTitle, subtitle: item.title });
+      } else {
+        await shareToChat({ kind: "event", id: item.id, title: item.title, subtitle: item.date });
+      }
+      setShared("Отправлено в чат");
+    } catch (error) {
+      setShared(error instanceof Error ? error.message : "Не ушло");
+    }
+  }
 
   return (
     <section className="flex min-h-0 w-full min-w-0 flex-1 flex-col px-5 pb-28">
@@ -811,6 +842,7 @@ export function CalendarScreen() {
       </div>
 
       <p className="mt-8 text-[12px] tracking-wider text-muted">БЛИЖАЙШЕЕ</p>
+      {shared ? <p className="mt-2 text-[13px] text-muted">{shared}</p> : null}
       {calendarItems.length === 0 ? (
         <p className="mt-10 text-center text-[16px] leading-snug text-muted">
           Пока пусто. Добавьте событие — партнёр увидит его сразу.
@@ -834,11 +866,11 @@ export function CalendarScreen() {
               setTab("tasks");
             };
             return (
-              <li key={item.id}>
+              <li key={item.id} className="flex items-stretch gap-2">
                 <button
                   type="button"
                   onClick={open}
-                  className={`w-full text-left ${
+                  className={`min-w-0 flex-1 text-left ${
                     active && done
                       ? "task-done-pulse px-4 py-3"
                       : active
@@ -853,8 +885,16 @@ export function CalendarScreen() {
                       {item.kind === "task" ? " · задача" : item.kind === "list" ? " · список" : ""}
                       {done ? " · готово" : ""}
                     </p>
-                    <p className="text-[16px]">{item.title}</p>
+                    <p className="truncate text-[16px]">{item.title}</p>
                   </div>
+                </button>
+                <button
+                  type="button"
+                  aria-label="В чат"
+                  onClick={() => void shareCalendarItem(item)}
+                  className="grid w-11 shrink-0 place-items-center rounded-2xl bg-raised"
+                >
+                  <MessageCircle className="size-4" />
                 </button>
               </li>
             );
@@ -953,6 +993,7 @@ export function WishesScreen() {
   const colors = usePlayerColors();
   const [sheet, setSheet] = useState<"new" | Wish | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  useOpenChatTarget("wish", (target) => setOpenId(target.id));
   const selected = wishes.find((w) => w.id === openId);
   const who = (wish: Wish) => viewedWishOwner(wish, myUserId);
 
@@ -1208,11 +1249,16 @@ function WishDetail({
           </button>
         ) : null}
 
-        <button type="button" className="mt-3 flex w-full items-center gap-3 rounded-2xl bg-raised px-4 py-4">
-          <MessageCircle className="size-5" />
-          <span className="flex-1 text-left">В чат</span>
-          <ChevronRight className="size-4 text-muted" />
-        </button>
+        <InChatRow
+          onSend={() =>
+            shareToChat({
+              kind: "wish",
+              id: wish.id,
+              title: wish.title,
+              subtitle: wish.price ? formatWishPrice(wish.price, wish.currency) : "",
+            })
+          }
+        />
       </div>
 
       <div className="absolute right-0 bottom-24 left-0 flex gap-3 px-5">
@@ -1248,6 +1294,7 @@ export function ListsScreen() {
   const myName = useCouple((s) => s.myName);
   const [sheet, setSheet] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  useOpenChatTarget("list", (target) => setOpenId(target.id));
   const selected = lists.find((l) => l.id === openId);
 
   if (selected) {
@@ -1507,11 +1554,10 @@ function ListDetail({ list, onBack }: { list: CheckList; onBack: () => void }) {
       <p className="mt-6 text-[13px] leading-snug text-muted">
         Пункт с датой сам появится в календаре. Отметить может любой из вас.
       </p>
-      <button type="button" className="mt-4 flex w-full items-center gap-3 rounded-2xl bg-raised px-4 py-4">
-        <MessageCircle className="size-5" />
-        <span className="flex-1 text-left">В чат</span>
-        <ChevronRight className="size-4 text-muted" />
-      </button>
+      <InChatRow
+        className="mt-4"
+        onSend={() => shareToChat({ kind: "list", id: list.id, title: list.title, subtitle: list.details })}
+      />
       {pick ? (
         <DatePicker
           mode="any"
@@ -1548,6 +1594,7 @@ const MORE = [
 export function MoreScreen() {
   const setMore = useCouple((s) => s.setMore);
   const moreOpen = useCouple((s) => s.moreOpen);
+  const chatUnread = useCouple((s) => s.chatUnread);
   const partnerName = useCouple((s) => s.partnerName);
   const quiz = useCouple((s) => s.quiz);
   const nudge = quizNudge({
@@ -1555,6 +1602,10 @@ export function MoreScreen() {
     partnerRemindedAt: quiz.partnerRemindedAt,
     partnerName,
   });
+
+  if (moreOpen === "chat") {
+    return <ChatScreen onBack={() => setMore(null)} />;
+  }
 
   if (moreOpen === "album") {
     return <AlbumScreen onBack={() => setMore(null)} />;
@@ -1638,7 +1689,13 @@ export function MoreScreen() {
                   <span className="mt-1 block text-[13px] leading-4 text-muted">{nudge}</span>
                 ) : null}
               </span>
-              <ChevronRight className="size-4 shrink-0 text-muted" />
+              {item.id === "chat" && chatUnread > 0 ? (
+                <span className="grid min-w-6 place-items-center rounded-full bg-cream px-1.5 text-[12px] font-semibold text-cream-fg">
+                  {badgeLabel(chatUnread)}
+                </span>
+              ) : (
+                <ChevronRight className="size-4 shrink-0 text-muted" />
+              )}
             </button>
           );
         })}

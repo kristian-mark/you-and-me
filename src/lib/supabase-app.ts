@@ -45,6 +45,27 @@ export async function sbSelect<T>(table: string, query: string): Promise<T[]> {
   return (await res.json()) as T[];
 }
 
+export async function sbUpsert<T = Record<string, unknown>>(
+  table: string,
+  row: Record<string, unknown>,
+  onConflict: string,
+): Promise<T[]> {
+  const { url } = serverConfig();
+  const conflict = onConflict
+    .split(",")
+    .map((part) => encodeURIComponent(part.trim()))
+    .join(",");
+  const res = await fetch(`${url}/rest/v1/${table}?on_conflict=${conflict}`, {
+    method: "POST",
+    headers: { ...headers(), Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify(row),
+  });
+  if (!res.ok) return fail(res);
+  const text = await res.text();
+  if (!text) return [];
+  return JSON.parse(text) as T[];
+}
+
 export async function sbInsert<T extends Record<string, unknown>>(
   table: string,
   row: T,

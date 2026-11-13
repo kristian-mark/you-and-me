@@ -8,6 +8,7 @@ import {
   MoreHorizontal,
   Plus,
 } from "lucide-react";
+import { badgeLabel } from "@/lib/chat-model";
 import { useCouple, usePlayerColors, type TabId } from "@/lib/couple-store";
 import { pieceBg } from "@/lib/pair-color";
 import { UsScreen } from "@/components/us-screen";
@@ -105,6 +106,7 @@ export function TabBar() {
   const setTab = useCouple((s) => s.setTab);
   const moreOpen = useCouple((s) => s.moreOpen);
   const openTaskId = useCouple((s) => s.openTaskId);
+  const chatUnread = useCouple((s) => s.chatUnread);
   if (moreOpen || openTaskId) return null;
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
@@ -119,7 +121,14 @@ export function TabBar() {
               onClick={() => setTab(t.id)}
               className={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 text-[10px] leading-none sm:text-[11px] ${active ? "text-fg" : "text-muted"}`}
             >
-              <Icon className="size-5" strokeWidth={active ? 2.2 : 1.7} />
+              <span className="relative">
+                <Icon className="size-5" strokeWidth={active ? 2.2 : 1.7} />
+                {t.id === "more" && chatUnread > 0 ? (
+                  <span className="absolute -top-1.5 -right-2 min-w-4 rounded-full bg-cream px-1 text-center text-[10px] leading-4 font-semibold text-cream-fg">
+                    {badgeLabel(chatUnread)}
+                  </span>
+                ) : null}
+              </span>
               {t.label}
             </button>
           );
