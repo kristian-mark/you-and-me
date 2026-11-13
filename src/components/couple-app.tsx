@@ -36,6 +36,8 @@ import { getMyPair, joinByInvite, saveMyProfile, saveTogetherSince, type PairPro
 import { savePairTask } from "@/lib/pair-tasks";
 import { packWish, savePairWish } from "@/lib/pair-wishes";
 import { refreshCoupleQuiz } from "@/lib/quiz-live";
+import { CHAT_BADGE_POLL_MS } from "@/lib/chat-model";
+import { getChatBadge } from "@/lib/chat-server";
 import { PAIR_POLL_MS, PAIR_WAIT_POLL_MS, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
 
 export function CoupleApp() {
@@ -233,6 +235,16 @@ function InviteScreen({
   );
 }
 
+function ChatBadgePoll() {
+  const chatOpen = useCouple((s) => s.moreOpen === "chat");
+  useScreenPoll("chat-badge", !chatOpen, CHAT_BADGE_POLL_MS, async () => {
+    const badge = await getChatBadge();
+    if (useCouple.getState().moreOpen === "chat") return;
+    useCouple.getState().setChatUnread(badge.unread);
+  });
+  return null;
+}
+
 function AppShell() {
   const tab = useCouple((s) => s.tab);
   const tasks = useCouple((s) => s.tasks);
@@ -315,6 +327,7 @@ function AppShell() {
       {tab === "wishes" ? <WishesScreen /> : null}
       {tab === "lists" ? <ListsScreen /> : null}
       {tab === "more" ? <MoreScreen /> : null}
+      <ChatBadgePoll />
       <TabBar />
     </main>
   );

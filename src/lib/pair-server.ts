@@ -4,6 +4,7 @@ import { ensureMembership, membershipOf, type ProfileRow } from "@/lib/pair-acce
 import { parsePieceColor, type PieceColor } from "@/lib/pair-color";
 import { assertSafeId, eqFilter, removeWishPhoto, sbDelete, sbInsert, sbPatch, sbSelect } from "@/lib/supabase-app";
 import { removePairAlbum } from "@/lib/album-core";
+import { removePairChat } from "@/lib/chat-core";
 import { deleteCoupleGames } from "@/lib/turn/server";
 
 export type PairProfile = {
@@ -194,6 +195,7 @@ export const leavePairRemote = createServerFn({ method: "POST" })
     const pairId = me.pairId;
     if (!pairId) return profileView(context.userId);
     await removePairAlbum(pairId);
+    await removePairChat(pairId);
     const wishes = await sbSelect<{ photo_path: string | null }>(
       "app_wishes",
       `${eqFilter("pair_id", pairId)}&select=photo_path`,

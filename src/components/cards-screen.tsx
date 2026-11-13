@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { SheetHeader } from "@/components/sheet-header";
 import { UsBadge } from "@/components/ui/shell";
+import { shareToChat, useOpenChatTarget } from "@/lib/chat-nav";
 import { useCouple, usePlayerColors, type CardKind, type LoyaltyCard } from "@/lib/couple-store";
 import { pieceBg } from "@/lib/pair-color";
 import { code128Pattern, ean13Pattern, patternToBars, qrGrid } from "@/lib/card-codes";
@@ -34,10 +35,13 @@ export function CardsScreen({ onBack }: { onBack: () => void }) {
   const cards = useCouple((s) => s.cards);
   const updateCard = useCouple((s) => s.updateCard);
   const deleteCard = useCouple((s) => s.deleteCard);
-  const addChat = useCouple((s) => s.addChat);
   const [mode, setMode] = useState<"list" | "scan" | "form">("list");
   const [draft, setDraft] = useState({ title: "", number: "", kind: "ean13" as CardKind, color: COLORS[0] });
   const [openId, setOpenId] = useState<string | null>(null);
+  useOpenChatTarget("loyalty", (target) => {
+    setMode("list");
+    setOpenId(target.id);
+  });
   const [menuId, setMenuId] = useState<string | null>(null);
   const [renameId, setRenameId] = useState<string | null>(null);
   const [toast, setToast] = useState("");
@@ -138,9 +142,10 @@ export function CardsScreen({ onBack }: { onBack: () => void }) {
               type="button"
               className="block w-full border-t border-line px-5 py-4 text-left text-[17px]"
               onClick={() => {
-                addChat(menuCard.title, menuCard.id);
+                void shareToChat({ kind: "loyalty", id: menuCard.id, title: menuCard.title, subtitle: "карта" })
+                  .then(() => setToast("Отправлено в чат"))
+                  .catch((error: unknown) => setToast(error instanceof Error ? error.message : "Не ушло"));
                 setMenuId(null);
-                setToast("Отправлено в чат");
               }}
             >
               Отправить в чат

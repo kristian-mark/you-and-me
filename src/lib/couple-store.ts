@@ -4,6 +4,7 @@ import { pickQuestion } from "@/lib/daily-questions";
 import { pairDayKey } from "@/lib/daily-sync";
 import { RU_MONTHS } from "@/lib/dates";
 import { pairColors, type PieceColor } from "@/lib/pair-color";
+import type { ChatTarget } from "@/lib/chat-model";
 import {
   DEMO_ANNIVERSARY,
   FALLBACK_MY_NAME,
@@ -274,6 +275,8 @@ type CoupleState = {
   daily: DailyState;
   cards: LoyaltyCard[];
   chat: ChatMsg[];
+  chatUnread: number;
+  chatTarget: ChatTarget | null;
   gameWins: GameWins;
   tttRecord: TttRecord;
   tttNoted: string;
@@ -325,6 +328,8 @@ type CoupleState = {
   setPartnerBirthday: (iso: string) => boolean;
   setTab: (tab: TabId) => void;
   setMore: (id: string | null) => void;
+  setChatUnread: (count: number) => void;
+  setChatTarget: (target: ChatTarget | null) => void;
   addTask: (input: Omit<Task, "id" | "done" | "createdAt" | "assignedBy">) => void;
   updateTask: (id: string, input: Partial<Task>) => void;
   deleteTask: (id: string) => void;
@@ -502,6 +507,8 @@ function blankPersonal(ownerId: string | null): Partial<CoupleState> {
     daily: { date: "", questionId: "real", skippedIds: [], history: [] },
     cards: [],
     chat: [],
+    chatUnread: 0,
+    chatTarget: null,
     gameWins: { me: 0, partner: 0 },
     tttRecord: { me: 0, partner: 0, games: 0 },
     tttNoted: "",
@@ -574,6 +581,8 @@ export const useCouple = create<CoupleState>()(
       },
       cards: [],
       chat: [],
+      chatUnread: 0,
+      chatTarget: null,
       gameWins: { me: 0, partner: 0 },
       tttRecord: { me: 0, partner: 0, games: 0 },
       tttNoted: "",
@@ -720,6 +729,8 @@ export const useCouple = create<CoupleState>()(
       },
       setTab: (tab) => set({ tab, moreOpen: null }),
       setMore: (id) => set({ moreOpen: id }),
+      setChatUnread: (count) => set({ chatUnread: Math.max(0, Math.floor(count) || 0) }),
+      setChatTarget: (target) => set({ chatTarget: target }),
       addTask: (input) =>
         set({
           tasks: [
@@ -1248,6 +1259,8 @@ export const useCouple = create<CoupleState>()(
           capsules: raw.capsules ?? [],
           cards: raw.cards ?? [],
           chat: raw.chat ?? [],
+          chatUnread: 0,
+          chatTarget: null,
           pairCode: raw.pairCode ?? null,
           seat: raw.seat === "b" ? "b" : "a",
           inviteCode: raw.inviteCode ?? null,
