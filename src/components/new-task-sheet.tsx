@@ -61,7 +61,7 @@ export function NewTaskSheet({ task, onClose }: { task?: Task; onClose: () => vo
 
   return (
     <div className="fixed inset-0 z-50 bg-bg">
-      <div className="mx-auto flex h-full max-w-md flex-col">
+      <div className="mx-auto flex h-full min-w-0 max-w-md flex-col overflow-x-hidden">
         <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 pt-5 pb-3">
           <button type="button" onClick={onClose} className="justify-self-start text-[17px] text-muted">
             Отмена
@@ -130,7 +130,7 @@ export function NewTaskSheet({ task, onClose }: { task?: Task; onClose: () => vo
 
           <div className="rounded-2xl bg-raised px-4 py-3">
             <p className="text-[11px] tracking-wider text-muted">КОМУ</p>
-            <div className="mt-3 flex rounded-2xl bg-bg p-1">
+            <div className="mt-3 grid min-w-0 grid-cols-2 gap-1 rounded-2xl bg-bg p-1">
               {(
                 [
                   ["free", "Никому"],
@@ -143,7 +143,7 @@ export function NewTaskSheet({ task, onClose }: { task?: Task; onClose: () => vo
                   key={id}
                   type="button"
                   onClick={() => setOwner(id)}
-                  className={`min-w-0 flex-1 truncate rounded-xl px-1 py-2 text-[13px] ${
+                  className={`min-w-0 rounded-xl px-2 py-2 text-[13px] leading-4 break-words ${
                     owner === id ? "bg-chip text-fg" : "text-muted"
                   }`}
                 >

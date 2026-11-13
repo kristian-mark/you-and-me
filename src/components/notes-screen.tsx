@@ -183,7 +183,7 @@ function FolderNotes({
   const visible = tag === "all" ? notes : notes.filter((n) => n.tags.includes(tag));
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col px-5 pb-28">
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden px-5 pb-28">
       <div className="flex items-center justify-between pt-5">
         <button type="button" onClick={onBack} className="text-muted">
           ‹ Заметки
@@ -193,11 +193,11 @@ function FolderNotes({
         </button>
       </div>
       <h1 className="mt-4 text-[32px] font-semibold">{title}</h1>
-      <div className="mt-4 flex gap-2 overflow-x-auto">
+      <div className="mt-4 flex min-w-0 flex-wrap gap-2">
         <button
           type="button"
           onClick={() => setTag("all")}
-          className={`rounded-full px-3 py-2 text-[13px] ${tag === "all" ? "bg-chip" : "bg-raised text-muted"}`}
+          className={`max-w-full rounded-full px-3 py-2 text-[13px] break-words ${tag === "all" ? "bg-chip" : "bg-raised text-muted"}`}
         >
           Все · {notes.length}
         </button>
@@ -206,7 +206,7 @@ function FolderNotes({
             key={t}
             type="button"
             onClick={() => setTag(t)}
-            className={`rounded-full px-3 py-2 text-[13px] ${tag === t ? "bg-chip" : "bg-raised text-muted"}`}
+            className={`max-w-full rounded-full px-3 py-2 text-[13px] break-words ${tag === t ? "bg-chip" : "bg-raised text-muted"}`}
           >
             #{t}
           </button>
