@@ -1,18 +1,9 @@
 import { useMemo, useState } from "react";
-import {
-  addMonths,
-  addYears,
-  differenceInCalendarDays,
-  eachDayOfInterval,
-  endOfMonth,
-  endOfWeek,
-  format,
-  isSameMonth,
-  startOfMonth,
-  startOfWeek,
-} from "date-fns";
-import { ru } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, LockKeyhole, PencilLine } from "lucide-react";
+import { addYears, differenceInCalendarDays } from "date-fns";
+import { LockKeyhole, PencilLine } from "lucide-react";
+import { DatePicker } from "@/components/date-picker";
+import { SheetHeader } from "@/components/sheet-header";
+import { formatRuDay, toIsoDate } from "@/lib/dates";
 import { useCouple, usePlayerColors, type Capsule } from "@/lib/couple-store";
 import { pieceBg } from "@/lib/pair-color";
 import { togetherDay } from "@/lib/pair-identity";
@@ -32,10 +23,7 @@ function parseDay(iso: string) {
 }
 
 function toIso(d: Date) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return toIsoDate(d);
 }
 
 function nextFromStamp(iso: string) {
@@ -47,8 +35,8 @@ function nextFromStamp(iso: string) {
   return next;
 }
 
-function labelDay(iso: string, pattern: string) {
-  return format(parseDay(iso), pattern, { locale: ru });
+function labelDay(iso: string, style: "dayMonth" | "long") {
+  return formatRuDay(iso, style);
 }
 
 export function CapsuleScreen({ onBack }: { onBack: () => void }) {
@@ -121,7 +109,7 @@ function CapsuleRow({
         <div className="min-w-0 flex-1">
           <p className="text-[17px] font-medium">{capsule.title || "Без названия"}</p>
           <p className="mt-1 text-[13px] leading-5 text-muted">
-            откроется {format(opens, "d MMMM", { locale: ru })}
+            откроется {formatRuDay(capsule.opensAt, "dayMonth")}
             {days > 0 ? ` · через ${days} ${daysWord(days)}` : ""}
             {capsule.author === "me" ? " · запечатана" : days > 0 ? "" : " · можно читать"}
           </p>
@@ -159,23 +147,17 @@ function WriteCapsule({ onClose }: { onClose: () => void }) {
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden px-5 pb-8">
-      <div className="flex items-center justify-between pt-5">
-        <button type="button" onClick={onClose} className="text-[17px] text-muted">
-          Отмена
-        </button>
-        <p className="text-[17px] font-semibold">Капсула</p>
-        <button
-          type="button"
-          disabled={!ready}
-          onClick={() => {
-            addCapsule({ title, body, opensAt, to: "partner" });
-            onClose();
-          }}
-          className={`text-[17px] ${ready ? "text-blue" : "text-muted"}`}
-        >
-          Запечатать
-        </button>
-      </div>
+      <SheetHeader
+        flush
+        title="Капсула"
+        onCancel={onClose}
+        doneLabel="Запечатать"
+        doneDisabled={!ready}
+        onDone={() => {
+          addCapsule({ title, body, opensAt, to: "partner" });
+          onClose();
+        }}
+      />
 
       <div className="mt-6 flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-[22px] bg-raised px-4 py-4">
         <span className="text-[16px] text-muted">Кому</span>
@@ -192,7 +174,7 @@ function WriteCapsule({ onClose }: { onClose: () => void }) {
       >
         <span className="text-[16px] text-muted">Откроется</span>
         <span className="rounded-full bg-chip px-3 py-1 text-[14px]">
-          {opensAt ? labelDay(opensAt, "d MMM yyyy") : "дата"}
+          {opensAt ? labelDay(opensAt, "long") : "дата"}
         </span>
       </button>
 
@@ -238,11 +220,13 @@ function WriteCapsule({ onClose }: { onClose: () => void }) {
 
       <p className="mt-3 rounded-[22px] bg-[#15202b] px-4 py-4 text-[14px] leading-5 text-[#9aa8b5]">
         После «Запечатать» текст уже не изменить. До{" "}
-        {opensAt ? labelDay(opensAt, "d MMMM") : "даты"} {partnerName} увидит
+        {opensAt ? labelDay(opensAt, "dayMonth") : "даты"} {partnerName} увидит
         только то, что письмо есть.
       </p>
       {pickDate ? (
-        <DaySheet
+        <DatePicker
+          mode="fromToday"
+          label="Откроется"
           value={opensAt}
           onPick={(day) => {
             setOpensAt(day);
@@ -272,8 +256,8 @@ function CapsuleDetail({ capsule, onBack }: { capsule: Capsule; onBack: () => vo
       <p className="mt-2 text-[14px] text-muted">
         для {capsule.to === "partner" ? partnerName : "тебя"} ·{" "}
         {locked
-          ? `откроется ${format(opens, "d MMMM yyyy", { locale: ru })}`
-          : `открылась ${format(opens, "d MMMM yyyy", { locale: ru })}`}
+          ? `откроется ${formatRuDay(capsule.opensAt, "long")}`
+          : `открылась ${formatRuDay(capsule.opensAt, "long")}`}
       </p>
       {canRead ? (
         <p className="mt-6 whitespace-pre-wrap rounded-[22px] bg-raised px-5 py-5 text-[16px] leading-7">
@@ -284,70 +268,10 @@ function CapsuleDetail({ capsule, onBack }: { capsule: Capsule; onBack: () => vo
           <LockKeyhole className="mx-auto size-8 text-muted" />
           <p className="mt-3 text-[16px]">Капсула запечатана</p>
           <p className="mt-2 text-[14px] text-muted">
-            До {format(opens, "d MMMM", { locale: ru })} с ней нельзя ничего сделать.
+            До {formatRuDay(capsule.opensAt, "dayMonth")} с ней нельзя ничего сделать.
           </p>
         </div>
       )}
     </section>
-  );
-}
-
-function DaySheet({
-  value,
-  onPick,
-  onClose,
-}: {
-  value?: string;
-  onPick: (day: string) => void;
-  onClose: () => void;
-}) {
-  const [cursor, setCursor] = useState(() => (value ? parseDay(value) : new Date()));
-  const days = eachDayOfInterval({
-    start: startOfWeek(startOfMonth(cursor), { weekStartsOn: 0 }),
-    end: endOfWeek(endOfMonth(cursor), { weekStartsOn: 0 }),
-  });
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={onClose}>
-      <div className="w-full rounded-t-3xl bg-raised px-5 pt-4 pb-8" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-3 flex items-center justify-between">
-          <button type="button" onClick={() => setCursor((d) => addMonths(d, -1))}>
-            <ChevronLeft className="size-5" />
-          </button>
-          <p className="text-[17px] font-semibold capitalize">
-            {format(cursor, "LLLL yyyy", { locale: ru })}
-          </p>
-          <button type="button" onClick={() => setCursor((d) => addMonths(d, 1))}>
-            <ChevronRight className="size-5" />
-          </button>
-        </div>
-        <div className="grid grid-cols-7 text-center text-[11px] text-muted">
-          {["ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"].map((d) => (
-            <div key={d}>{d}</div>
-          ))}
-        </div>
-        <div className="mt-2 grid grid-cols-7 gap-y-1 text-center">
-          {days.map((day) => {
-            const key = format(day, "yyyy-MM-dd");
-            const picked = key === value;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => onPick(key)}
-                className={`mx-auto grid size-9 place-items-center rounded-full text-[15px] ${
-                  picked ? "bg-[#163a3c] text-[#6ed7dc]" : isSameMonth(day, cursor) ? "text-fg" : "text-muted/40"
-                }`}
-              >
-                {format(day, "d")}
-              </button>
-            );
-          })}
-        </div>
-        <button type="button" onClick={onClose} className="mt-4 w-full py-3 text-muted">
-          Закрыть
-        </button>
-      </div>
-    </div>
   );
 }

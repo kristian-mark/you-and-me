@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { Check, Folder, FolderMinus, Plus, Search } from "lucide-react";
-import { format, isToday } from "date-fns";
-import { ru } from "date-fns/locale";
+import { SheetHeader } from "@/components/sheet-header";
 import { EmptyState, UsBadge } from "@/components/ui/shell";
+import { formatRuNoteStamp } from "@/lib/dates";
 import { useCouple, usePlayerColors, type Note } from "@/lib/couple-store";
 import { pieceText } from "@/lib/pair-color";
 
@@ -333,19 +333,13 @@ function NoteEditor({ note, onClose }: { note?: Note; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 bg-bg">
       <div className="mx-auto flex h-full max-w-md flex-col px-4">
-        <header className="grid grid-cols-[1fr_auto_1fr] items-center pt-5 pb-3">
-          <button type="button" onClick={onClose} className="justify-self-start text-muted">
-            Отмена
-          </button>
-          <h2 className="text-[17px] font-semibold">{note ? "Заметка" : "Новая заметка"}</h2>
-          <button
-            type="button"
-            onClick={save}
-            className={`justify-self-end ${title.trim() ? "text-blue" : "text-muted"}`}
-          >
-            Готово
-          </button>
-        </header>
+        <SheetHeader
+          flush
+          title={note ? "Заметка" : "Новая заметка"}
+          onCancel={onClose}
+          onDone={save}
+          doneMuted={!title.trim()}
+        />
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -502,15 +496,7 @@ function FolderEditor({
   return (
     <div className="fixed inset-0 z-50 bg-bg">
       <div className="mx-auto max-w-md px-4">
-        <header className="grid grid-cols-[1fr_auto_1fr] items-center pt-5">
-          <button type="button" onClick={onClose} className="justify-self-start text-muted">
-            Отмена
-          </button>
-          <h2 className="text-[17px] font-semibold">Новая папка</h2>
-          <button type="button" onClick={save} className={`justify-self-end ${title.trim() ? "text-blue" : "text-muted"}`}>
-            Готово
-          </button>
-        </header>
+        <SheetHeader flush title="Новая папка" onCancel={onClose} onDone={save} doneMuted={!title.trim()} />
         <label className="mt-6 block rounded-2xl bg-raised px-4 py-3">
           <span className="text-[11px] tracking-wider text-muted">НАЗВАНИЕ</span>
           <input
@@ -541,7 +527,5 @@ function FolderEditor({
 }
 
 function noteStamp(iso: string) {
-  const d = new Date(iso);
-  if (isToday(d)) return `сегодня, ${format(d, "HH:mm")}`;
-  return format(d, "d MMMM, HH:mm", { locale: ru });
+  return formatRuNoteStamp(iso);
 }

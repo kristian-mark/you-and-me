@@ -1,28 +1,17 @@
 import { useMemo, useState } from "react";
-import { Camera, ChevronLeft, ChevronRight, Eye, Lock, Shield, Sparkles, X } from "lucide-react";
+import { Camera, Eye, Lock, Shield, Sparkles, X } from "lucide-react";
+import { AccountLogoutButton } from "@/components/account-logout";
+import { DatePicker } from "@/components/date-picker";
+import { PairCode } from "@/components/pair-code";
+import { SheetHeader } from "@/components/sheet-header";
+import { formatRuDay, RU_MONTHS, RU_MONTHS_SHORT, togetherChoiceLabel, toIsoDate } from "@/lib/dates";
 import { useCouple, usePlayerColors, viewedWishOwner, type Person } from "@/lib/couple-store";
 import { pieceBg } from "@/lib/pair-color";
 import { leaveSharedPair } from "@/lib/leave-pair";
 import { refreshPairTasks, refreshPairWishes } from "@/lib/pair-live";
 import { LIST_POLL_MS, useScreenPoll } from "@/lib/screen-poll";
-import { togetherDay, anniversaryCountdown } from "@/lib/pair-identity";
+import { anniversaryCountdown, FALLBACK_MY_NAME, isoDay, togetherDay } from "@/lib/pair-identity";
 import { saveMyProfile, saveTogetherSince } from "@/lib/pair-server";
-import { AccountLogoutButton } from "@/components/account-logout";
-
-const MONTHS_SHORT = ["янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"];
-
-function dayLabel(iso: string) {
-  const [, m, d] = iso.split("-").map(Number);
-  if (!m || !d) return "";
-  return `${MONTHS_SHORT[m - 1]} ${d}`;
-}
-
-function personDay(iso: string, noYear?: boolean) {
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!m || !d) return "";
-  if (noYear) return `${d} ${MONTHS_SHORT[m - 1]}`;
-  return `${d} ${MONTHS_SHORT[m - 1]} · ${y}`;
-}
 
 export function UsScreen({ onClose }: { onClose: () => void }) {
   useScreenPoll("tasks", true, LIST_POLL_MS, refreshPairTasks);
@@ -159,8 +148,6 @@ function Stat({ n, label }: { n: number; label: string }) {
   );
 }
 
-const MONTH_FULL = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
-
 function YearScreen({ year, onBack }: { year: number; onBack: () => void }) {
   const anniversary = useCouple((s) => s.anniversaryDate);
   const pairedAt = useCouple((s) => s.pairedAt);
@@ -173,7 +160,7 @@ function YearScreen({ year, onBack }: { year: number; onBack: () => void }) {
   const doneWishes = wishes.filter((w) => w.fulfilled && (w.fulfilledAt ?? w.createdAt).startsWith(prefix));
   const mine = doneWishes.filter((w) => viewedWishOwner(w, myUserId) === "me").length;
   const latest = [...doneWishes].sort((a, b) => (b.fulfilledAt ?? b.createdAt).localeCompare(a.fulfilledAt ?? a.createdAt))[0];
-  const latestMonth = latest ? MONTH_FULL[Number((latest.fulfilledAt ?? latest.createdAt).slice(5, 7)) - 1] : "";
+  const latestMonth = latest ? RU_MONTHS[Number((latest.fulfilledAt ?? latest.createdAt).slice(5, 7)) - 1] : "";
   const closed = tasks.filter((t) => t.done && (t.dueDate ?? t.createdAt).startsWith(prefix)).length;
   const files = notes.filter((n) => n.createdAt.startsWith(prefix)).length;
   const start = new Date(`${together}T12:00:00`);
@@ -251,7 +238,7 @@ function YearScreen({ year, onBack }: { year: number; onBack: () => void }) {
         <div className="mt-3 flex items-center justify-between text-[13px] text-muted">
           <span>янв</span>
           <span className="text-[#e07a72]">
-            {MONTHS_SHORT[busy]} — {counts[busy]} запис
+            {RU_MONTHS_SHORT[busy]} — {counts[busy]} запис
             {counts[busy] === 1 ? "ь" : counts[busy] > 1 && counts[busy] < 5 ? "и" : "ей"}
           </span>
           <span>дек</span>
@@ -271,13 +258,16 @@ function Row({ label, value, last }: { label: string; value: string; last?: bool
 }
 
 function CoupleSettings({ onBack }: { onBack: () => void }) {
-  const pairCode = useCouple((s) => s.pairCode);
+  const inviteCode = useCouple((s) => s.inviteCode);
+  const joined = useCouple((s) => s.joined);
   const myName = useCouple((s) => s.myName);
   const partnerName = useCouple((s) => s.partnerName);
   const pairedAt = useCouple((s) => s.pairedAt);
   const people = useCouple((s) => s.people);
   const anniversary = useCouple((s) => s.anniversaryDate);
-  const together = togetherDay(anniversary, pairedAt);
+  const gettingMarried = useCouple((s) => s.gettingMarried);
+  const weddingDate = useCouple((s) => s.weddingDate);
+  const choice = togetherChoiceLabel(anniversary, pairedAt);
   const colors = usePlayerColors();
   const [page, setPage] = useState<"hub" | "people" | "dates" | "leave" | "name">("hub");
   if (page === "people") return <PeopleScreen onBack={() => setPage("hub")} />;
@@ -287,10 +277,8 @@ function CoupleSettings({ onBack }: { onBack: () => void }) {
   const bits = myName.trim().split(/\s+/);
   const first = bits[0] ?? myName;
   const rest = bits.slice(1).join(" ");
-  const since = together;
-  const pretty = since ? `${since.slice(5, 7)}/${since.slice(8, 10)}/${since.slice(0, 4)}` : "не указана";
-  const joined = togetherDay(null, pairedAt);
-  const joinedLabel = joined ? `в приложении с ${joined.slice(8, 10)}.${joined.slice(5, 7)}.${joined.slice(0, 4)}` : "в паре";
+  const connected = togetherDay(null, pairedAt);
+  const joinedLabel = connected ? `в приложении с ${formatRuDay(connected, "numeric")}` : "в паре";
   return (
     <section className="fixed inset-0 z-[80] overflow-y-auto bg-bg">
       <div className="app-sheet px-5 pb-4">
@@ -327,9 +315,22 @@ function CoupleSettings({ onBack }: { onBack: () => void }) {
         onClick={() => setPage("dates")}
         className="mt-2 flex w-full items-center justify-between rounded-[22px] bg-raised px-4 py-4"
       >
-        <span>Вместе с</span>
-        <span className="text-muted">{pretty} ›</span>
+        <span className="min-w-0 text-left">
+          <span className="block">Вместе с</span>
+          {choice.hint ? <span className="block text-[13px] text-muted">{choice.hint}</span> : null}
+        </span>
+        <span className="shrink-0 text-muted">{choice.value} ›</span>
       </button>
+      {gettingMarried ? (
+        <button
+          type="button"
+          onClick={() => setPage("dates")}
+          className="mt-3 flex w-full items-center justify-between rounded-[22px] bg-raised px-4 py-4"
+        >
+          <span>Свадьба</span>
+          <span className="text-muted">{weddingDate ? formatRuDay(weddingDate, "long") : "не указана"} ›</span>
+        </button>
+      ) : null}
 
       <button
         type="button"
@@ -343,11 +344,16 @@ function CoupleSettings({ onBack }: { onBack: () => void }) {
         </span>
       </button>
 
-      <div className="mt-3 rounded-[22px] bg-raised px-4 py-4">
-        <p className="text-[13px] text-muted">Код пары</p>
-        <p className="mt-2 text-[28px] font-semibold tracking-[0.18em] text-pink">
-          {(pairCode ?? "").split("").join(" ")}
-        </p>
+      <div className="mt-3">
+        <PairCode
+          code={inviteCode}
+          label="Твой код"
+          hint={
+            joined
+              ? "Пара уже собрана. Этим кодом партнёр вошёл. Новый человек по нему не подключится."
+              : "Партнёр вводит этот код у себя. В паре только двое."
+          }
+        />
       </div>
 
       <button
@@ -365,33 +371,41 @@ function CoupleSettings({ onBack }: { onBack: () => void }) {
 
 function NameScreen({ onBack }: { onBack: () => void }) {
   const myName = useCouple((s) => s.myName);
-  const [value, setValue] = useState(myName);
+  const [value, setValue] = useState(myName === FALLBACK_MY_NAME ? "" : myName);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    const next = value.trim();
+    if (!next || saving) return;
+    setSaving(true);
+    setError("");
+    useCouple.getState().setMyName(next);
+    try {
+      const saved = await saveMyProfile({ data: { displayName: next } });
+      if (saved.displayName) useCouple.getState().setMyName(saved.displayName);
+      onBack();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Имя не сохранилось");
+      setSaving(false);
+    }
+  };
   return (
-    <section className="fixed inset-0 z-[80] bg-bg px-5 pt-6">
-      <div className="flex items-center justify-between">
-        <button type="button" onClick={onBack} className="text-muted">
-          Отмена
-        </button>
-        <p className="text-[17px] font-semibold">Имя</p>
-        <button
-          type="button"
-          onClick={() => {
-            const next = value.trim();
-            if (!next) return;
-            useCouple.getState().setMyName(next);
-            void saveMyProfile({ data: { displayName: next } }).catch(() => undefined);
-            onBack();
+    <section className="fixed inset-0 z-[80] bg-bg px-5">
+      <SheetHeader flush title="Имя" onCancel={onBack} onDone={() => void save()} doneDisabled={!value.trim() || saving} />
+      <label className="mt-4 block rounded-[22px] bg-raised px-4 py-3">
+        <span className="text-[11px] tracking-[0.14em] text-muted uppercase">как тебя видит партнёр</span>
+        <input
+          value={value}
+          autoFocus
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void save();
           }}
-          className="inline-flex min-h-11 items-center text-blue"
-        >
-          Готово
-        </button>
-      </div>
-      <input
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        className="mt-8 w-full rounded-[22px] bg-raised px-4 py-4 text-[17px] outline-none"
-      />
+          placeholder="Имя"
+          className="mt-1 w-full bg-transparent text-[17px] outline-none placeholder:text-muted"
+        />
+      </label>
+      {error ? <p className="mt-3 text-[14px] text-[#e07a72]">{error}</p> : null}
     </section>
   );
 }
@@ -399,8 +413,7 @@ function NameScreen({ onBack }: { onBack: () => void }) {
 function PeopleScreen({ onBack }: { onBack: () => void }) {
   const people = useCouple((s) => s.people);
   const anniversaryDate = useCouple((s) => s.anniversaryDate);
-  const pairedAt = useCouple((s) => s.pairedAt);
-  const anniversary = togetherDay(anniversaryDate, pairedAt);
+  const anniversary = isoDay(anniversaryDate);
   const [edit, setEdit] = useState<(typeof people)[number] | "new" | null>(null);
   return (
     <section className="fixed inset-0 z-[80] flex flex-col bg-bg px-5 pb-10 pt-4">
@@ -430,7 +443,9 @@ function PeopleScreen({ onBack }: { onBack: () => void }) {
                   <span className="block text-[16px]">{p.name}</span>
                   {p.relation ? <span className="text-[13px] text-muted">{p.relation}</span> : null}
                 </span>
-                <span className="text-[15px] text-muted">{personDay(p.date, p.noYear)}</span>
+                <span className="text-[15px] text-muted">
+                  {formatRuDay(p.date, p.noYear ? "dayMonth" : "long")}
+                </span>
               </button>
             </li>
           ))}
@@ -447,7 +462,7 @@ function PeopleScreen({ onBack }: { onBack: () => void }) {
           <span className="text-[15px] text-[#f07167]">♥</span>
           Годовщина пары
         </span>
-        <span className="text-[15px] text-muted">{anniversary ? dayLabel(anniversary) : "не указана"}</span>
+        <span className="text-[15px] text-muted">{anniversary ? formatRuDay(anniversary, "dayMonth") : "не указана"}</span>
       </div>
 
       {edit ? (
@@ -465,13 +480,6 @@ function PeopleScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-function prettyDate(iso: string, noYear: boolean) {
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!m || !d) return "";
-  const months = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
-  return noYear ? `${d} ${months[m - 1]}` : `${d} ${months[m - 1]} ${y}`;
-}
-
 function PersonForm({
   initial,
   onCancel,
@@ -481,8 +489,7 @@ function PersonForm({
   onCancel: () => void;
   onSave: (row: { name: string; date: string; relation: string; note: string; noYear: boolean }) => void;
 }) {
-  const today = new Date();
-  const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const iso = toIsoDate(new Date());
   const [name, setName] = useState(initial?.name ?? "");
   const [relation, setRelation] = useState(initial?.relation ?? "");
   const [date, setDate] = useState(initial?.date ?? iso);
@@ -495,20 +502,14 @@ function PersonForm({
       <button type="button" onClick={onCancel} className="grid size-11 place-items-center rounded-full bg-raised text-[20px]">
         ‹
       </button>
-      <div className="mt-2 flex items-center justify-between">
-        <button type="button" onClick={onCancel} className="text-[17px] text-muted">
-          Отмена
-        </button>
-        <p className="text-[17px] font-semibold">Человек</p>
-        <button
-          type="button"
-          disabled={!ready}
-          onClick={() => onSave({ name: name.trim(), date, relation: relation.trim(), note: note.trim(), noYear })}
-          className={`text-[17px] ${ready ? "text-blue" : "text-muted"}`}
-        >
-          Готово
-        </button>
-      </div>
+      <SheetHeader
+        flush
+        pad={false}
+        title="Человек"
+        onCancel={onCancel}
+        doneDisabled={!ready}
+        onDone={() => onSave({ name: name.trim(), date, relation: relation.trim(), note: note.trim(), noYear })}
+      />
 
       <label className="mt-5 block rounded-[22px] bg-raised px-4 py-3">
         <span className="text-[11px] tracking-[0.14em] text-muted uppercase">имя</span>
@@ -536,7 +537,7 @@ function PersonForm({
         className="mt-3 flex w-full items-center justify-between rounded-[22px] bg-raised px-4 py-4"
       >
         <span className="text-[16px]">Дата рождения</span>
-        <span className="text-[16px] text-blue">{prettyDate(date, noYear)}</span>
+        <span className="text-[16px] text-blue">{formatRuDay(date, noYear ? "dayMonth" : "long")}</span>
       </button>
 
       <div className="mt-3 flex items-center justify-between rounded-[22px] bg-raised px-4 py-4">
@@ -569,7 +570,9 @@ function PersonForm({
         Это чужие данные — храним минимум. Никаких телефонов и адресов, и не будет.
       </p>
       {cal ? (
-        <DarkCal
+        <DatePicker
+          mode="birthday"
+          label="Дата рождения"
           value={date}
           onPick={(day) => {
             setDate(day);
@@ -582,135 +585,47 @@ function PersonForm({
   );
 }
 
-const MONTHS_FULL = [
-  "январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь",
-];
-
-function DarkCal({
-  value,
-  onPick,
-  onClose,
-}: {
-  value: string;
-  onPick: (day: string) => void;
-  onClose: () => void;
-}) {
-  const [y, m] = value.split("-").map(Number);
-  const [cursor, setCursor] = useState({ y: y || new Date().getFullYear(), m: m || new Date().getMonth() + 1 });
-  const first = new Date(cursor.y, cursor.m - 1, 1);
-  const start = (first.getDay() + 6) % 7;
-  const count = new Date(cursor.y, cursor.m, 0).getDate();
-  const cells = Array.from({ length: start + count }, (_, i) => {
-    if (i < start) return "";
-    const d = i - start + 1;
-    return `${cursor.y}-${String(cursor.m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-  });
-  const prev = () =>
-    setCursor((c) => (c.m === 1 ? { y: c.y - 1, m: 12 } : { y: c.y, m: c.m - 1 }));
-  const next = () =>
-    setCursor((c) => (c.m === 12 ? { y: c.y + 1, m: 1 } : { y: c.y, m: c.m + 1 }));
-  return (
-    <div className="fixed inset-0 z-[100] flex items-end bg-black/60" onClick={onClose}>
-      <div className="w-full rounded-t-[28px] bg-[#1c1e24] px-5 pb-8 pt-4" onClick={(e) => e.stopPropagation()}>
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20" />
-        <div className="mb-3 flex items-center justify-between">
-          <button type="button" onClick={prev} className="grid size-10 place-items-center rounded-full bg-raised">
-            <ChevronLeft className="size-5" />
-          </button>
-          <p className="text-[17px] font-semibold capitalize">
-            {MONTHS_FULL[cursor.m - 1]} {cursor.y}
-          </p>
-          <button type="button" onClick={next} className="grid size-10 place-items-center rounded-full bg-raised">
-            <ChevronRight className="size-5" />
-          </button>
-        </div>
-        <div className="grid grid-cols-7 text-center text-[11px] text-muted">
-          {["ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"].map((d) => (
-            <div key={d} className="py-1">
-              {d}
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-y-1 text-center">
-          {cells.map((key, i) =>
-            key ? (
-              <button
-                key={key}
-                type="button"
-                onClick={() => onPick(key)}
-                className={`mx-auto grid size-10 place-items-center rounded-full text-[16px] ${
-                  key === value ? "bg-blue text-white" : "text-fg"
-                }`}
-              >
-                {Number(key.slice(8))}
-              </button>
-            ) : (
-              <span key={`e${i}`} />
-            ),
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            const n = new Date();
-            onPick(`${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`);
-          }}
-          className="mt-4 w-full py-3 text-[16px] text-blue"
-        >
-          Сегодня
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function DatesScreen({ onBack }: { onBack: () => void }) {
   const anniversary = useCouple((s) => s.anniversaryDate);
   const pairedAt = useCouple((s) => s.pairedAt);
   const gettingMarried = useCouple((s) => s.gettingMarried);
+  const storedWedding = useCouple((s) => s.weddingDate);
   const partnerName = useCouple((s) => s.partnerName);
   const [date, setDate] = useState(anniversary);
   const [marry, setMarry] = useState(gettingMarried);
-  const [cal, setCal] = useState(false);
-  const pretty = date
-    ? `${date.slice(5, 7)}/${date.slice(8, 10)}/${date.slice(0, 4)}`
-    : "не указана";
+  const [wedding, setWedding] = useState(storedWedding);
+  const [pick, setPick] = useState<"together" | "wedding" | null>(null);
+  const anchor = togetherDay(null, pairedAt) ?? toIsoDate(new Date());
   return (
-    <section className="fixed inset-0 z-[80] overflow-y-auto bg-bg px-5 pb-16 pt-6">
-      <div className="flex items-center justify-between">
-        <button type="button" onClick={onBack} className="text-muted">
-          Отмена
-        </button>
-        <p className="text-[17px] font-semibold">Наши даты</p>
-        <button
-          type="button"
-          onClick={() => {
-            useCouple.getState().setAnniversaryDate(date);
-            useCouple.getState().setGettingMarried(marry);
-            void saveTogetherSince({ data: date || null }).catch(() => undefined);
-            onBack();
-          }}
-          className="text-blue"
-        >
-          Готово
-        </button>
-      </div>
+    <section className="fixed inset-0 z-[80] overflow-y-auto bg-bg px-5 pb-16">
+      <SheetHeader
+        flush
+        title="Наши даты"
+        onCancel={onBack}
+        onDone={() => {
+          useCouple.getState().setAnniversaryDate(date);
+          useCouple.getState().setGettingMarried(marry, wedding);
+          void saveTogetherSince({ data: date || null }).catch(() => undefined);
+          onBack();
+        }}
+      />
       <button
         type="button"
-        onClick={() => setCal(true)}
-        className="mt-6 flex w-full items-center justify-between rounded-[22px] bg-raised px-4 py-4 text-left"
+        onClick={() => setPick("together")}
+        className="mt-4 flex w-full items-center justify-between gap-3 rounded-[22px] bg-raised px-4 py-4 text-left"
       >
-        <span>
+        <span className="min-w-0">
           <span className="block">Вместе с</span>
           <span className="text-[13px] text-muted">когда всё началось</span>
         </span>
-        <span className="text-blue">{pretty}</span>
+        <span className="shrink-0 text-blue">{date ? formatRuDay(date, "long") : "не указана"}</span>
       </button>
       <p className="mt-3 rounded-[22px] bg-raised px-4 py-4 text-[15px] text-muted">
         Оставь пустым — считаем со дня, когда связались в приложении
+        {anchor ? ` (${formatRuDay(anchor, "numeric")})` : ""}.
       </p>
-      <div className="mt-3 flex items-center justify-between rounded-[22px] bg-[#e07a72] px-4 py-4 text-black">
-        <span>
+      <div className="mt-3 flex items-center justify-between gap-3 rounded-[22px] bg-[#e07a72] px-4 py-4 text-black">
+        <span className="min-w-0">
           <span className="block font-semibold">Мы женимся!</span>
           <span className="text-[13px] opacity-80">появится обратный отсчёт, а после — «женаты столько»</span>
         </span>
@@ -722,18 +637,45 @@ function DatesScreen({ onBack }: { onBack: () => void }) {
           <span className={`block size-6 rounded-full bg-white transition ${marry ? "translate-x-5" : "translate-x-0.5"}`} />
         </button>
       </div>
+      {marry ? (
+        <button
+          type="button"
+          onClick={() => setPick("wedding")}
+          className="mt-3 flex w-full items-center justify-between gap-3 rounded-[22px] bg-raised px-4 py-4 text-left"
+        >
+          <span>Дата свадьбы</span>
+          <span className="shrink-0 text-blue">{wedding ? formatRuDay(wedding, "long") : "не указана"}</span>
+        </button>
+      ) : null}
       <p className="mt-3 flex items-start gap-2 rounded-[22px] bg-raised px-4 py-4 text-[14px] text-muted">
         <Eye className="mt-0.5 size-4 shrink-0" />
         Даты общие: {partnerName} видит их сразу и может менять.
       </p>
-      {cal ? (
-        <DarkCal
-          value={date || togetherDay(null, pairedAt) || new Date().toISOString().slice(0, 10)}
+      {pick === "together" ? (
+        <DatePicker
+          mode="untilToday"
+          label="Вместе с"
+          value={date}
+          anchor={anchor}
+          allowClear
           onPick={(day) => {
             setDate(day);
-            setCal(false);
+            setPick(null);
           }}
-          onClose={() => setCal(false)}
+          onClose={() => setPick(null)}
+        />
+      ) : null}
+      {pick === "wedding" ? (
+        <DatePicker
+          mode="any"
+          label="Свадьба"
+          value={wedding}
+          allowClear
+          onPick={(day) => {
+            setWedding(day);
+            setPick(null);
+          }}
+          onClose={() => setPick(null)}
         />
       ) : null}
     </section>

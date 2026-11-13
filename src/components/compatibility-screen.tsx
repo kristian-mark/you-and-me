@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, Clock, EyeOff, Lock, Users } from "lucide-react";
-import { format } from "date-fns";
-import { ru } from "date-fns/locale";
+import { formatRuInstant } from "@/lib/dates";
 import { useCouple, usePlayerColors } from "@/lib/couple-store";
 import { pieceBg, pieceBorder, pieceText } from "@/lib/pair-color";
 import { QUIZ, SEE, buildReport } from "@/lib/quiz-data";
@@ -255,8 +254,8 @@ function Wait({ onBack, onReport }: { onBack: () => void; onReport: () => void }
   const colors = usePlayerColors();
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState(false);
-  const when = quiz.myDoneAt ? format(new Date(quiz.myDoneAt), "d MMMM", { locale: ru }) : "";
-  const partnerWhen = quiz.partnerDoneAt ? format(new Date(quiz.partnerDoneAt), "d MMMM", { locale: ru }) : "";
+  const when = quiz.myDoneAt ? formatRuInstant(quiz.myDoneAt, "dayMonth") : "";
+  const partnerWhen = quiz.partnerDoneAt ? formatRuInstant(quiz.partnerDoneAt, "dayMonth") : "";
   const canRemind = remindAllowed(quiz.remindedAt ?? null, Date.now());
 
   const remind = () => {

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Check, Circle, Hourglass } from "lucide-react";
+import { SheetHeader } from "@/components/sheet-header";
 import { useCouple, usePlayerColors, type VotePoll } from "@/lib/couple-store";
 import { pieceBg, pieceText } from "@/lib/pair-color";
 
@@ -81,23 +82,17 @@ function NewVote({ onClose }: { onClose: () => void }) {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col px-5 pb-28">
-      <div className="flex items-center justify-between pt-5">
-        <button type="button" onClick={onClose} className="text-[17px] text-muted">
-          Отмена
-        </button>
-        <p className="text-[17px] font-semibold">Голосование</p>
-        <button
-          type="button"
-          disabled={!ready}
-          onClick={() => {
-            addVote(question, options);
-            onClose();
-          }}
-          className={`text-[17px] ${ready ? "text-blue" : "text-muted"}`}
-        >
-          Спросить
-        </button>
-      </div>
+      <SheetHeader
+        flush
+        title="Голосование"
+        onCancel={onClose}
+        doneLabel="Спросить"
+        doneDisabled={!ready}
+        onDone={() => {
+          addVote(question, options);
+          onClose();
+        }}
+      />
 
       <label className="mt-6 block rounded-[22px] bg-raised px-5 py-4">
         <span className="text-[11px] tracking-[0.12em] text-muted uppercase">Вопрос</span>

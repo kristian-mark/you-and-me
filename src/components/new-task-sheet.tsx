@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
-import { format } from "date-fns";
-import { ru } from "date-fns/locale";
+import { useState } from "react";
 import { Eye, Plus } from "lucide-react";
+import { DatePicker } from "@/components/date-picker";
+import { SheetHeader } from "@/components/sheet-header";
+import { formatRuDay, toIsoDate } from "@/lib/dates";
 import { useCouple, viewedOwner, type RepeatKind, type Subtask, type Task, type TaskOwner } from "@/lib/couple-store";
 
 const REPEATS: { id: RepeatKind; label: string }[] = [
@@ -22,14 +23,14 @@ export function NewTaskSheet({ task, onClose }: { task?: Task; onClose: () => vo
   const updateTask = useCouple((s) => s.updateTask);
   const partnerName = useCouple((s) => s.partnerName);
   const myUserId = useCouple((s) => s.myUserId);
-  const dateRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState(task?.title ?? "");
   const [subtasks, setSubtasks] = useState<Subtask[]>(() => asSubtasks(task?.subtasks));
   const [draftSub, setDraftSub] = useState("");
   const [addingSub, setAddingSub] = useState(false);
   const [owner, setOwner] = useState<TaskOwner>(task ? viewedOwner(task, myUserId) : "free");
   const [dueOn, setDueOn] = useState(Boolean(task?.dueDate));
-  const [dueDate, setDueDate] = useState(task?.dueDate ?? format(new Date(), "yyyy-MM-dd"));
+  const [dueDate, setDueDate] = useState(task?.dueDate ?? toIsoDate(new Date()));
+  const [pickDate, setPickDate] = useState(false);
   const [repeat, setRepeat] = useState<RepeatKind>(task?.repeat ?? "none");
   const [showRepeat, setShowRepeat] = useState(false);
   const [inCalendar, setInCalendar] = useState(Boolean(task?.showInCalendar));
@@ -52,31 +53,16 @@ export function NewTaskSheet({ task, onClose }: { task?: Task; onClose: () => vo
     onClose();
   };
 
-  const openDate = () => {
-    const el = dateRef.current;
-    if (!el) return;
-    if (typeof el.showPicker === "function") el.showPicker();
-    else el.click();
-  };
-
   return (
     <div className="fixed inset-0 z-50 bg-bg">
       <div className="mx-auto flex h-full min-w-0 max-w-md flex-col overflow-x-hidden">
-        <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 pt-5 pb-3">
-          <button type="button" onClick={onClose} className="justify-self-start text-[17px] text-muted">
-            Отмена
-          </button>
-          <h2 className="whitespace-nowrap text-center text-[17px] font-semibold">
-            {task ? "Изменить" : "Новая задача"}
-          </h2>
-          <button
-            type="button"
-            onClick={save}
-            className={`justify-self-end text-[17px] ${title.trim() ? "text-fg" : "text-muted"}`}
-          >
-            Готово
-          </button>
-        </header>
+        <SheetHeader
+          title={task ? "Изменить" : "Новая задача"}
+          onCancel={onClose}
+          onDone={save}
+          doneMuted={!title.trim()}
+          doneTone="fg"
+        />
 
         <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-8">
           <label className="block rounded-2xl bg-raised px-4 py-3">
@@ -167,23 +153,13 @@ export function NewTaskSheet({ task, onClose }: { task?: Task; onClose: () => vo
             <>
               <button
                 type="button"
-                onClick={openDate}
-                className="relative flex w-full items-center justify-between overflow-hidden rounded-2xl bg-raised px-4 py-4"
+                onClick={() => setPickDate(true)}
+                className="flex w-full items-center justify-between rounded-2xl bg-raised px-4 py-4"
               >
                 <span className="text-[16px]">Когда</span>
                 <span className="rounded-full bg-chip px-3 py-1 text-[14px]">
-                  {format(new Date(`${dueDate}T12:00:00`), "d MMM yyyy", { locale: ru })}
+                  {formatRuDay(dueDate, "long")}
                 </span>
-                <input
-                  ref={dateRef}
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => {
-                    if (e.target.value) setDueDate(e.target.value);
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="absolute inset-0 cursor-pointer opacity-0"
-                />
               </button>
 
               <button
@@ -241,6 +217,18 @@ export function NewTaskSheet({ task, onClose }: { task?: Task; onClose: () => vo
           </div>
         </div>
       </div>
+      {pickDate ? (
+        <DatePicker
+          mode="any"
+          label="Срок"
+          value={dueDate}
+          onPick={(day) => {
+            setDueDate(day);
+            setPickDate(false);
+          }}
+          onClose={() => setPickDate(false)}
+        />
+      ) : null}
     </div>
   );
 }
