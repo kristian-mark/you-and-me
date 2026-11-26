@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
-import { CircleHelp, Crosshair, MousePointerClick, Sailboat, Trophy, X } from "lucide-react";
+import { Crosshair, MousePointerClick, Sailboat, Trophy, X } from "lucide-react";
+import { GameTools } from "@/components/activity-bell";
 import { useCouple, usePlayerColors } from "@/lib/couple-store";
 import { pieceBg, type PieceColor } from "@/lib/pair-color";
 import { ScoreLine } from "@/components/score-line";
@@ -211,9 +212,7 @@ export function SeaMatch({ onBack }: { onBack: () => void; onAgain?: () => void 
             ‹ Игры
           </button>
           <span className="sr-only">Морской бой</span>
-          <button type="button" onClick={() => setHelp(true)} className="grid size-11 place-items-center justify-self-end text-[#e6e1d6]" aria-label="Правила">
-            <CircleHelp className="size-5" />
-          </button>
+          <GameTools onHelp={() => setHelp(true)} />
         </header>
 
         {!view || !banner ? (

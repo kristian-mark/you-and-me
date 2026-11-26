@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CircleHelp } from "lucide-react";
+import { GameTools } from "@/components/activity-bell";
 import { useCouple, usePlayerColors } from "@/lib/couple-store";
 import { pieceBg, pieceBorder, pieceText, type PieceColor } from "@/lib/pair-color";
 import { GAME_POLL_MS, pollFailureNotice, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
@@ -182,14 +182,14 @@ export function TicTacToe({ onBack }: { onBack: () => void; onAgain?: () => void
   return (
     <section className="fixed inset-0 z-30 flex flex-col overflow-hidden bg-bg" data-status={view?.status ?? "loading"}>
       <div className="app-frame flex min-h-0 w-full flex-1 flex-col">
-        <header className="grid shrink-0 grid-cols-[auto_1fr_auto] items-center gap-2">
-          <button type="button" onClick={onBack} className="inline-flex min-h-11 items-center pr-2 text-[17px] text-[#e6e1d6]">
-            ‹ Игры
-          </button>
-          <h1 className="truncate text-center text-[17px] font-semibold">Крестики-нолики</h1>
-          <button type="button" onClick={() => setHelp(true)} className="grid size-11 place-items-center text-[#e6e1d6]" aria-label="Правила">
-            <CircleHelp className="size-5" />
-          </button>
+        <header className="shrink-0 px-2 pt-1">
+          <div className="flex items-center justify-between">
+            <button type="button" onClick={onBack} className="inline-flex min-h-11 items-center pr-2 text-[17px] text-[#e6e1d6]">
+              ‹ Игры
+            </button>
+            <GameTools onHelp={() => setHelp(true)} />
+          </div>
+          <h1 className="truncate px-1 pb-1 text-center text-[17px] font-semibold">Крестики-нолики</h1>
         </header>
 
         {!view || !banner ? (

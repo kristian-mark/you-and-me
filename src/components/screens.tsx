@@ -50,6 +50,7 @@ import { NewTaskSheet } from "@/components/new-task-sheet";
 import { NewWishSheet } from "@/components/new-wish-sheet";
 import { DatePicker } from "@/components/date-picker";
 import { PairCode } from "@/components/pair-code";
+import { ActivityBell } from "@/components/activity-bell";
 import { SheetHeader } from "@/components/sheet-header";
 import { EmptyState, ScreenHeader, UsBadge } from "@/components/ui/shell";
 import { WishPhoto } from "@/components/wish-photo";
@@ -433,10 +434,12 @@ function TaskDetail({
 
   return (
     <section className="flex min-h-0 flex-1 flex-col px-5 pb-28">
-      <header className="flex items-center justify-between pt-5">
-        <button type="button" onClick={onBack} className="text-muted">
+      <header className="flex min-w-0 items-center justify-between gap-2 pt-5">
+        <button type="button" onClick={onBack} className="min-w-0 truncate text-muted">
           ‹ Задачи
         </button>
+        <div className="flex shrink-0 items-center">
+          <ActivityBell />
         <div className="relative">
           <button
             type="button"
@@ -470,6 +473,7 @@ function TaskDetail({
               </button>
             </div>
           ) : null}
+        </div>
         </div>
       </header>
       <p className="mt-4 flex items-center gap-2 text-[12px] tracking-wider text-muted">
@@ -742,9 +746,12 @@ export function CalendarScreen() {
 
   return (
     <section className="flex min-h-0 w-full min-w-0 flex-1 flex-col px-5 pb-[calc(12.5rem+env(safe-area-inset-bottom))]">
-      <p className="min-w-0 pt-5 text-[13px] text-muted uppercase">
-        {formatRuWeekday(new Date())}
-      </p>
+      <div className="flex min-w-0 items-center gap-2 pt-5">
+        <p className="min-w-0 flex-1 truncate text-[13px] text-muted uppercase">
+          {formatRuWeekday(new Date())}
+        </p>
+        <ActivityBell />
+      </div>
       <div className="mt-2 flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <h1 className="min-w-0 text-[32px] leading-none font-semibold capitalize">
           {capitalRu(RU_MONTHS[cursor.getMonth()] ?? "")}
@@ -1187,7 +1194,8 @@ function WishDetail({
         >
           <ChevronLeft className="size-5" />
         </button>
-        <div className="absolute top-4 right-4">
+        <div className="absolute top-4 right-3 flex items-center">
+          <ActivityBell />
           <button
             type="button"
             onClick={() => setMenu((v) => !v)}
@@ -1407,10 +1415,12 @@ function ListDetail({ list, onBack }: { list: CheckList; onBack: () => void }) {
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden px-5 pb-28">
-      <header className="flex items-center justify-between pt-5">
-        <button type="button" onClick={onBack} className="text-muted">
+      <header className="flex min-w-0 items-center justify-between gap-2 pt-5">
+        <button type="button" onClick={onBack} className="min-w-0 truncate text-muted">
           ‹ Списки
         </button>
+        <div className="flex shrink-0 items-center">
+          <ActivityBell />
         <div className="relative">
           <button type="button" onClick={() => setMenu((v) => !v)} className="px-2 text-muted" aria-label="Ещё">
             ⋯
@@ -1429,6 +1439,7 @@ function ListDetail({ list, onBack }: { list: CheckList; onBack: () => void }) {
               </button>
             </div>
           ) : null}
+        </div>
         </div>
       </header>
       <h1 className="mt-4 text-[32px] font-semibold">{list.title}</h1>
@@ -1595,6 +1606,7 @@ export function MoreScreen() {
   const setMore = useCouple((s) => s.setMore);
   const moreOpen = useCouple((s) => s.moreOpen);
   const chatUnread = useCouple((s) => s.chatUnread);
+  const activity = useCouple((s) => s.activity.counts);
   const partnerName = useCouple((s) => s.partnerName);
   const quiz = useCouple((s) => s.quiz);
   const nudge = quizNudge({
@@ -1668,6 +1680,7 @@ export function MoreScreen() {
     <section className="px-5 pt-6 pb-28">
       <div className="flex min-w-0 items-center gap-2">
         <h1 className="min-w-0 flex-1 truncate text-[32px] font-semibold">Ещё</h1>
+        <ActivityBell />
         <UsBadge />
       </div>
       <div className="mt-5 overflow-hidden rounded-[28px] bg-raised">
@@ -1692,6 +1705,18 @@ export function MoreScreen() {
               {item.id === "chat" && chatUnread > 0 ? (
                 <span className="grid min-w-6 place-items-center rounded-full bg-cream px-1.5 text-[12px] font-semibold text-cream-fg">
                   {badgeLabel(chatUnread)}
+                </span>
+              ) : item.id === "album" && activity.album > 0 ? (
+                <span className="grid min-w-6 place-items-center rounded-full bg-cream px-1.5 text-[12px] font-semibold text-cream-fg">
+                  {badgeLabel(activity.album)}
+                </span>
+              ) : item.id === "question" && activity.question > 0 ? (
+                <span className="grid min-w-6 place-items-center rounded-full bg-cream px-1.5 text-[12px] font-semibold text-cream-fg">
+                  {badgeLabel(activity.question)}
+                </span>
+              ) : item.id === "test" && activity.test > 0 ? (
+                <span className="grid min-w-6 place-items-center rounded-full bg-cream px-1.5 text-[12px] font-semibold text-cream-fg">
+                  {badgeLabel(activity.test)}
                 </span>
               ) : (
                 <ChevronRight className="size-4 shrink-0 text-muted" />

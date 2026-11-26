@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ActivityBell } from "@/components/activity-bell";
 import { ChevronRight, Circle, Contrast, Grid3x3, Hash, Sailboat, Spade, Square } from "lucide-react";
 import { ConnectFourMatch } from "@/components/c4-screen";
 import { DotsMatch } from "@/components/dots-screen";
@@ -42,9 +43,12 @@ export function GamesScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <section className="px-5 pt-6 pb-10">
-      <button type="button" onClick={onBack} className="inline-flex min-h-11 items-center text-[17px] text-[#e6e1d6]">
-        ‹ Ещё
-      </button>
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <button type="button" onClick={onBack} className="inline-flex min-h-11 items-center text-[17px] text-[#e6e1d6]">
+          ‹ Ещё
+        </button>
+        <ActivityBell />
+      </div>
       <h1 className="mt-4 text-[40px] font-semibold tracking-tight">Игры</h1>
 
       <div className="mt-5 grid grid-cols-2 rounded-[28px] bg-raised px-4 py-4">

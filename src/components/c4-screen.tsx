@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CircleHelp } from "lucide-react";
+import { GameTools } from "@/components/activity-bell";
 import { useCouple, usePlayerColors } from "@/lib/couple-store";
 import { pieceBg, type PieceColor } from "@/lib/pair-color";
 import { GAME_POLL_MS, pollFailureNotice, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
@@ -127,9 +127,7 @@ export function ConnectFourMatch({ onBack }: { onBack: () => void; onAgain?: () 
             ‹ Игры
           </button>
           <span className="sr-only">Четыре в ряд</span>
-          <button type="button" onClick={() => setHelp(true)} className="grid size-11 place-items-center justify-self-end text-[#e6e1d6]" aria-label="Правила">
-            <CircleHelp className="size-5" />
-          </button>
+          <GameTools onHelp={() => setHelp(true)} />
         </header>
 
         {!view || !banner ? (

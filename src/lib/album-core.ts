@@ -410,7 +410,7 @@ export async function updateCoupleAlbum(
   const pairId = await requirePair(userId);
   const album = await albumInPair(pairId, input.id);
   if (!album) throw new Error("Альбом не найден");
-  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString(), updated_by: userId };
   if (input.title !== undefined) {
     const title = cleanTitle(input.title);
     if (!title) throw new Error("Напиши название");
@@ -501,12 +501,14 @@ export async function changeAlbumPhotos(
     `${eqFilter("pair_id", pairId)}&${eqFilter("album_id", album.id)}&select=album_id,photo_id`,
   );
   const still = new Set(left.map((row) => row.photo_id));
+  const patch: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+    updated_by: userId,
+  };
   if (!album.cover_photo_id || !still.has(album.cover_photo_id)) {
-    await sbPatch("app_albums", `${eqFilter("pair_id", pairId)}&${eqFilter("id", album.id)}`, {
-      cover_photo_id: left[0]?.photo_id ?? null,
-      updated_at: new Date().toISOString(),
-    });
+    patch.cover_photo_id = left[0]?.photo_id ?? null;
   }
+  await sbPatch("app_albums", `${eqFilter("pair_id", pairId)}&${eqFilter("id", album.id)}`, patch);
   return { removed: remove.length };
 }
 

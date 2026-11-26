@@ -3,6 +3,7 @@ import { Camera, Eye, Lock, Shield, Sparkles, X } from "lucide-react";
 import { AccountLogoutButton } from "@/components/account-logout";
 import { DatePicker } from "@/components/date-picker";
 import { PairCode } from "@/components/pair-code";
+import { ActivityBell } from "@/components/activity-bell";
 import { SheetHeader } from "@/components/sheet-header";
 import { formatRuDay, RU_MONTHS, RU_MONTHS_SHORT, togetherChoiceLabel, toIsoDate } from "@/lib/dates";
 import { useCouple, usePlayerColors, viewedWishOwner, type Person } from "@/lib/couple-store";
@@ -48,13 +49,14 @@ export function UsScreen({ onClose }: { onClose: () => void }) {
       <p className="text-[11px] tracking-[0.16em] text-muted uppercase">
         {myName} и {partnerName}
       </p>
-      <div className="mt-2 flex items-center justify-between">
-        <h1 className="text-[34px] font-semibold tracking-tight">Мы</h1>
-        <div className="flex items-center gap-2">
-          <span className="relative h-5 w-8">
+      <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
+        <h1 className="min-w-0 flex-1 truncate text-[34px] font-semibold tracking-tight">Мы</h1>
+        <div className="flex shrink-0 items-center">
+          <span className="relative mr-1 h-5 w-8">
             <span className={`absolute left-0 top-0.5 size-4 rounded-full ${pieceBg(colors.me)}`} />
             <span className={`absolute right-0 top-0.5 size-4 rounded-full ${pieceBg(colors.partner)}`} />
           </span>
+          <ActivityBell />
           <button type="button" onClick={onClose} className="grid size-11 place-items-center rounded-full bg-raised" aria-label="Закрыть">
             <X className="size-5" />
           </button>

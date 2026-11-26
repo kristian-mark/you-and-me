@@ -1,5 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import {
+  emptyActivity,
+  withoutItem,
+  withoutSection,
+  type ActivitySection,
+  type ActivitySnapshot,
+} from "@/lib/activity-model";
 import { pickQuestion } from "@/lib/daily-questions";
 import { pairDayKey } from "@/lib/daily-sync";
 import { RU_MONTHS } from "@/lib/dates";
@@ -277,6 +284,7 @@ type CoupleState = {
   chat: ChatMsg[];
   chatUnread: number;
   chatTarget: ChatTarget | null;
+  activity: ActivitySnapshot;
   gameWins: GameWins;
   tttRecord: TttRecord;
   tttNoted: string;
@@ -330,6 +338,10 @@ type CoupleState = {
   setMore: (id: string | null) => void;
   setChatUnread: (count: number) => void;
   setChatTarget: (target: ChatTarget | null) => void;
+  setActivity: (snap: ActivitySnapshot) => void;
+  forgetActivitySection: (section: ActivitySection) => void;
+  forgetActivityItem: (id: string) => void;
+  clearActivity: () => void;
   addTask: (input: Omit<Task, "id" | "done" | "createdAt" | "assignedBy">) => void;
   updateTask: (id: string, input: Partial<Task>) => void;
   deleteTask: (id: string) => void;
@@ -509,6 +521,7 @@ function blankPersonal(ownerId: string | null): Partial<CoupleState> {
     chat: [],
     chatUnread: 0,
     chatTarget: null,
+    activity: emptyActivity(),
     gameWins: { me: 0, partner: 0 },
     tttRecord: { me: 0, partner: 0, games: 0 },
     tttNoted: "",
@@ -583,6 +596,7 @@ export const useCouple = create<CoupleState>()(
       chat: [],
       chatUnread: 0,
       chatTarget: null,
+      activity: emptyActivity(),
       gameWins: { me: 0, partner: 0 },
       tttRecord: { me: 0, partner: 0, games: 0 },
       tttNoted: "",
@@ -731,6 +745,10 @@ export const useCouple = create<CoupleState>()(
       setMore: (id) => set({ moreOpen: id }),
       setChatUnread: (count) => set({ chatUnread: Math.max(0, Math.floor(count) || 0) }),
       setChatTarget: (target) => set({ chatTarget: target }),
+      setActivity: (snap) => set({ activity: snap }),
+      forgetActivitySection: (section) => set({ activity: withoutSection(get().activity, section) }),
+      forgetActivityItem: (id) => set({ activity: withoutItem(get().activity, id) }),
+      clearActivity: () => set({ activity: emptyActivity(), chatUnread: 0 }),
       addTask: (input) =>
         set({
           tasks: [
@@ -1261,6 +1279,7 @@ export const useCouple = create<CoupleState>()(
           chat: raw.chat ?? [],
           chatUnread: 0,
           chatTarget: null,
+          activity: emptyActivity(),
           pairCode: raw.pairCode ?? null,
           seat: raw.seat === "b" ? "b" : "a",
           inviteCode: raw.inviteCode ?? null,

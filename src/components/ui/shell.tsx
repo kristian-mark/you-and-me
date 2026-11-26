@@ -8,6 +8,8 @@ import {
   MoreHorizontal,
   Plus,
 } from "lucide-react";
+import { ActivityBell } from "@/components/activity-bell";
+import { moreActivityCount } from "@/lib/activity-model";
 import { badgeLabel } from "@/lib/chat-model";
 import { useCouple, usePlayerColors, type TabId } from "@/lib/couple-store";
 import { pieceBg } from "@/lib/pair-color";
@@ -50,20 +52,25 @@ export function ScreenHeader({
   onAdd?: () => void;
 }) {
   return (
-    <header className="flex min-w-0 items-center gap-2 px-5 pt-6 pb-4">
-      <h1 className="min-w-0 flex-1 truncate text-[28px] font-semibold tracking-tight sm:text-[32px]">{title}</h1>
-      <div className="flex shrink-0 items-center gap-1.5">
-        {onAdd ? (
-          <button
-            type="button"
-            onClick={onAdd}
-            className="grid size-10 place-items-center rounded-full bg-raised"
-            aria-label="Добавить"
-          >
-            <Plus className="size-5" />
-          </button>
-        ) : null}
-        <UsBadge />
+    <header className="px-5 pt-3 pb-4">
+      <div className="flex justify-end">
+        <ActivityBell />
+      </div>
+      <div className="flex min-w-0 items-center gap-2">
+        <h1 className="min-w-0 flex-1 truncate text-[28px] font-semibold tracking-tight sm:text-[32px]">{title}</h1>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {onAdd ? (
+            <button
+              type="button"
+              onClick={onAdd}
+              className="grid size-10 place-items-center rounded-full bg-raised"
+              aria-label="Добавить"
+            >
+              <Plus className="size-5" />
+            </button>
+          ) : null}
+          <UsBadge />
+        </div>
       </div>
     </header>
   );
@@ -101,12 +108,22 @@ export function EmptyState({
   );
 }
 
+function tabCount(id: TabId, counts: { tasks: number; calendar: number; wishes: number }) {
+  if (id === "tasks") return counts.tasks;
+  if (id === "calendar") return counts.calendar;
+  if (id === "wishes") return counts.wishes;
+  return 0;
+}
+
 export function TabBar() {
   const tab = useCouple((s) => s.tab);
   const setTab = useCouple((s) => s.setTab);
   const moreOpen = useCouple((s) => s.moreOpen);
   const openTaskId = useCouple((s) => s.openTaskId);
   const chatUnread = useCouple((s) => s.chatUnread);
+  const counts = useCouple((s) => s.activity.counts);
+  const colors = usePlayerColors();
+  const moreExtra = moreActivityCount(counts);
   if (moreOpen || openTaskId) return null;
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
@@ -127,6 +144,17 @@ export function TabBar() {
                   <span className="absolute -top-1.5 -right-2 min-w-4 rounded-full bg-cream px-1 text-center text-[10px] leading-4 font-semibold text-cream-fg">
                     {badgeLabel(chatUnread)}
                   </span>
+                ) : t.id === "more" && moreExtra > 0 ? (
+                  <span className="absolute -top-1.5 -right-2 min-w-4 rounded-full bg-cream px-1 text-center text-[10px] leading-4 font-semibold text-cream-fg">
+                    {badgeLabel(moreExtra)}
+                  </span>
+                ) : tabCount(t.id, counts) > 0 ? (
+                  <span className="absolute -top-1.5 -right-2 min-w-4 rounded-full bg-cream px-1 text-center text-[10px] leading-4 font-semibold text-cream-fg">
+                    {badgeLabel(tabCount(t.id, counts))}
+                  </span>
+                ) : null}
+                {t.id === "more" && chatUnread > 0 && moreExtra > 0 ? (
+                  <span className={`absolute -top-0.5 -left-1.5 size-2 rounded-full ${pieceBg(colors.partner)}`} />
                 ) : null}
               </span>
               {t.label}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, CircleHelp, Layers, MousePointerClick, Plus, Trophy, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Layers, MousePointerClick, Plus, Trophy, X } from "lucide-react";
+import { GameTools } from "@/components/activity-bell";
 import { useCouple, usePlayerColors } from "@/lib/couple-store";
 import { pieceBg } from "@/lib/pair-color";
 import { ScoreLine } from "@/components/score-line";
@@ -274,9 +275,7 @@ export function DurakMatch({ onBack }: { onBack: () => void; onAgain?: () => voi
             ‹ Игры
           </button>
           <span className="sr-only">Дурак</span>
-          <button type="button" onClick={() => setHelp(true)} className="grid size-11 place-items-center justify-self-end text-[#e6e1d6]" aria-label="Правила">
-            <CircleHelp className="size-5" />
-          </button>
+          <GameTools onHelp={() => setHelp(true)} />
         </header>
 
         {!view || !banner ? (
