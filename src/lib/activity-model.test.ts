@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 import {
   activityPreview,
   activityText,
+  ruUnreadLabel,
+  taskContentSame,
+  wishContentSame,
   albumRecordDraft,
   bellTotal,
   chatDraft,
@@ -184,6 +187,53 @@ test("activity migration locks the cursor table and can run twice", () => {
     assert.doesNotMatch(code, /drop table/i);
     assert.doesNotMatch(sql, /'chat'/);
   }
+});
+
+test("an unchanged task or wish is not a new edit, and a new photo is", () => {
+  const task = {
+    title: "Купить",
+    owner: "me",
+    ownerUserId: "user-a",
+    done: false,
+    subtasks: [],
+    note: "",
+    dueDate: null,
+    repeat: "none",
+    showInCalendar: false,
+    createdAt: "2026-11-01T00:00:00.000Z",
+    claimedAt: null,
+    createdBy: "user-a",
+    deleted: false,
+  };
+  assert.equal(taskContentSame(task, { ...task, dueDate: undefined, note: undefined }), true);
+  assert.equal(taskContentSame(task, { ...task, title: "Другое" }), false);
+  const wish = {
+    title: "Куртка",
+    link: "",
+    photo: "",
+    photoPath: "pair/w1.webp",
+    price: "",
+    currency: "RUB",
+    priority: "want",
+    note: "",
+    owner: "me",
+    ownerUserId: "user-a",
+    createdAt: "2026-11-01T00:00:00.000Z",
+    fulfilled: false,
+    fulfilledAt: null,
+    deleted: false,
+  };
+  assert.equal(wishContentSame(wish, { ...wish, currency: "RUB" }), true);
+  assert.equal(wishContentSame(wish, { ...wish, photo: "data:image/jpeg;base64,abc" }), false);
+});
+
+test("the bell count uses russian number forms", () => {
+  assert.equal(ruUnreadLabel(1), "1 новое");
+  assert.equal(ruUnreadLabel(2), "2 новых");
+  assert.equal(ruUnreadLabel(5), "5 новых");
+  assert.equal(ruUnreadLabel(11), "11 новых");
+  assert.equal(ruUnreadLabel(21), "21 новое");
+  assert.equal(ruUnreadLabel(22), "22 новых");
 });
 
 test("the open screen is the one whose badge should clear", () => {

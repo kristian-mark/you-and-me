@@ -101,6 +101,15 @@ export function partnerVerb(name: string, male: string, female: string) {
   return feminineName(name) ? female : male;
 }
 
+/** «1 новое», «2 новых», «5 новых», «21 новое». */
+export function ruUnreadLabel(count: number) {
+  const n = Math.abs(Math.floor(Number.isFinite(count) ? count : 0));
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  const word = mod10 === 1 && mod100 !== 11 ? "новое" : "новых";
+  return `${n} ${word}`;
+}
+
 export function clipActivityText(value: string, max = 60) {
   const text = value.replace(/\s+/g, " ").trim();
   if (text.length <= max) return text;
@@ -256,6 +265,104 @@ export function taskActivityAction(
   if (next.deleted) return "deleted";
   if (next.done && !previous.done) return "done";
   return "updated";
+}
+
+type TaskSnapshot = {
+  id?: string;
+  title?: string;
+  owner?: string;
+  ownerUserId?: string | null;
+  done?: boolean;
+  subtasks?: unknown;
+  note?: string;
+  dueDate?: string | null;
+  repeat?: string;
+  showInCalendar?: boolean;
+  createdAt?: string;
+  claimedAt?: string | null;
+  createdBy?: string | null;
+  deleted?: boolean;
+};
+
+type WishSnapshot = {
+  id?: string;
+  title?: string;
+  link?: string;
+  photo?: string;
+  photoPath?: string | null;
+  price?: string;
+  currency?: string;
+  priority?: string;
+  note?: string;
+  owner?: string;
+  ownerUserId?: string | null;
+  createdAt?: string;
+  fulfilled?: boolean;
+  fulfilledAt?: string | null;
+  deleted?: boolean;
+};
+
+function stable(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stable);
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+      out[key] = stable((value as Record<string, unknown>)[key]);
+    }
+    return out;
+  }
+  return value ?? null;
+}
+
+function sameCanon(left: unknown, right: unknown) {
+  return JSON.stringify(stable(left)) === JSON.stringify(stable(right));
+}
+
+function canonTask(task: TaskSnapshot) {
+  return {
+    title: task.title || "Задача",
+    owner: task.owner ?? "free",
+    ownerUserId: task.ownerUserId ?? null,
+    done: Boolean(task.done),
+    subtasks: task.subtasks ?? [],
+    note: task.note ?? "",
+    dueDate: task.dueDate || null,
+    repeat: task.repeat || "none",
+    showInCalendar: Boolean(task.showInCalendar),
+    createdAt: task.createdAt ?? "",
+    claimedAt: task.claimedAt ?? null,
+    createdBy: task.createdBy ?? null,
+    deleted: Boolean(task.deleted),
+  };
+}
+
+function canonWish(wish: WishSnapshot) {
+  return {
+    title: wish.title || "Хотелка",
+    link: wish.link ?? "",
+    photo: wish.photo ?? "",
+    photoPath: wish.photoPath ?? null,
+    price: wish.price ?? "",
+    currency: wish.currency || "USD",
+    priority: wish.priority || "want",
+    note: wish.note ?? "",
+    owner: wish.owner === "partner" ? "partner" : "me",
+    ownerUserId: wish.ownerUserId ?? null,
+    createdAt: wish.createdAt ?? "",
+    fulfilled: Boolean(wish.fulfilled),
+    fulfilledAt: wish.fulfilledAt ?? null,
+    deleted: Boolean(wish.deleted),
+  };
+}
+
+/** True when a save would not change the shared row. A new photo always counts. */
+export function taskContentSame(current: TaskSnapshot, incoming: TaskSnapshot) {
+  return sameCanon(canonTask(current), canonTask(incoming));
+}
+
+export function wishContentSame(current: WishSnapshot, incoming: WishSnapshot) {
+  if ((incoming.photo ?? "").startsWith("data:")) return false;
+  return sameCanon(canonWish(current), canonWish({ ...incoming, photo: incoming.photo ?? "" }));
 }
 
 export function wishActivityAction(

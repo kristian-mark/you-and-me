@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Check, Circle, Hourglass } from "lucide-react";
+import { ActivityBell } from "@/components/activity-bell";
 import { SheetHeader } from "@/components/sheet-header";
 import { useCouple, usePlayerColors, type VotePoll } from "@/lib/couple-store";
 import { pieceBg, pieceText } from "@/lib/pair-color";
@@ -19,13 +20,16 @@ export function VotingScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col px-5 pb-28">
-      <div className="flex items-center justify-between pt-5">
-        <button type="button" onClick={onBack} className="text-[17px] text-muted">
+      <div className="flex min-w-0 items-center justify-between gap-2 pt-5">
+        <button type="button" onClick={onBack} className="min-h-11 shrink-0 text-[17px] text-muted">
           ‹ Ещё
         </button>
-        <button type="button" onClick={() => setCreating(true)} className="text-[17px] text-blue">
-          Новое
-        </button>
+        <div className="flex shrink-0 items-center">
+          <ActivityBell />
+          <button type="button" onClick={() => setCreating(true)} className="min-h-11 px-1 text-[17px] text-blue">
+            Новое
+          </button>
+        </div>
       </div>
       <h1 className="mt-5 text-[34px] font-semibold tracking-tight">Голосование</h1>
 
@@ -82,8 +86,12 @@ function NewVote({ onClose }: { onClose: () => void }) {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col px-5 pb-28">
+      <div className="flex justify-end">
+        <ActivityBell />
+      </div>
       <SheetHeader
         flush
+        pad={false}
         title="Голосование"
         onCancel={onClose}
         doneLabel="Спросить"
@@ -145,9 +153,12 @@ function VoteDetail({ vote, onBack }: { vote: VotePoll; onBack: () => void }) {
   if (vote.myChoice) {
     return (
       <section className="flex min-h-0 flex-1 flex-col px-5 pb-28">
-        <button type="button" onClick={onBack} className="pt-5 text-left text-[17px] text-muted">
-          ‹ Голосование
-        </button>
+        <div className="flex min-w-0 items-center justify-between gap-2 pt-5">
+          <button type="button" onClick={onBack} className="min-h-11 min-w-0 truncate text-left text-[17px] text-muted">
+            ‹ Голосование
+          </button>
+          <ActivityBell />
+        </div>
         <h1 className="mt-6 text-[32px] font-semibold leading-9">{vote.question}</h1>
 
         <div className="mt-6 grid grid-cols-2 gap-3">
@@ -229,9 +240,12 @@ function VoteDetail({ vote, onBack }: { vote: VotePoll; onBack: () => void }) {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col px-5 pb-28">
-      <button type="button" onClick={onBack} className="pt-5 text-left text-[17px] text-muted">
-        ‹ Голосование
-      </button>
+      <div className="flex min-w-0 items-center justify-between gap-2 pt-5">
+        <button type="button" onClick={onBack} className="min-h-11 min-w-0 truncate text-left text-[17px] text-muted">
+          ‹ Голосование
+        </button>
+        <ActivityBell />
+      </div>
       <p className="mt-6 text-[12px] tracking-[0.14em] text-muted uppercase">
         Давай выберем · от {vote.createdBy === "me" ? myName : partnerName}
       </p>

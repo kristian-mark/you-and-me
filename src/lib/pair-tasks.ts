@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
-import { taskActivityAction } from "@/lib/activity-model";
+import { taskActivityAction, taskContentSame } from "@/lib/activity-model";
 import type { Task } from "@/lib/couple-store";
 import { myPairId, stillInPair } from "@/lib/pair-access";
 import { assertSafeId, eqFilter, sbDelete, sbInsert, sbPatch, sbSelect } from "@/lib/supabase-app";
@@ -92,6 +92,9 @@ async function writeTask(userId: string, pairId: string, task: Task, deleted: bo
   const previous = existing
     ? { done: existing.done, deleted: Boolean(payloadOf(existing).deleted) }
     : null;
+  if (existing && taskContentSame(parseTask(existing), { ...task, id, deleted })) {
+    return parseTask(existing);
+  }
   const body = taskBody({ ...task, id }, deleted, userId, previous);
   if (!existing) {
     try {

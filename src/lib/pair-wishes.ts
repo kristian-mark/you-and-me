@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
-import { wishActivityAction } from "@/lib/activity-model";
+import { wishActivityAction, wishContentSame } from "@/lib/activity-model";
 import type { Wish } from "@/lib/couple-store";
 import { myPairId, stillInPair } from "@/lib/pair-access";
 import {
@@ -118,6 +118,9 @@ export const savePairWish = createServerFn({ method: "POST" })
     const id = assertSafeId(wish.id);
     const existing = await rowById(id);
     if (existing && existing.pair_id !== pairId) throw new Error("Чужая хотелка");
+    if (existing && wishContentSame(parseWish(existing), { ...wish, id })) {
+      return parseWish(existing);
+    }
     const photo = await photoForSave(pairId, { ...wish, id });
     const previous = existing
       ? { fulfilled: existing.fulfilled, deleted: Boolean(payloadOf(existing).deleted) }

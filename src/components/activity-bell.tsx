@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Bell, CircleHelp } from "lucide-react";
 import { SheetHeader } from "@/components/sheet-header";
+import { beginActivityClear, finishActivityClear } from "@/lib/activity-gate";
 import { markActivitySeen, markAllPairActivity } from "@/lib/activity-server";
-import { activityPreview, activityText, bellTotal, type ActivityItem } from "@/lib/activity-model";
+import { activityPreview, activityText, bellTotal, ruUnreadLabel, type ActivityItem } from "@/lib/activity-model";
 import { openActivity } from "@/lib/activity-nav";
 import { badgeLabel } from "@/lib/chat-model";
 import { useCouple, usePlayerColors } from "@/lib/couple-store";
@@ -18,9 +19,12 @@ function ActivitySheet({ onClose }: { onClose: () => void }) {
   const accent = pieceText(colors.partner);
 
   const readAll = () => {
+    beginActivityClear();
     useCouple.getState().clearActivity();
     onClose();
-    void markAllPairActivity().catch(() => undefined);
+    void markAllPairActivity()
+      .catch(() => undefined)
+      .finally(() => finishActivityClear());
   };
 
   const openItem = (item: ActivityItem) => {
@@ -91,7 +95,7 @@ export function ActivityBell() {
         type="button"
         onClick={() => setOpen(true)}
         className="relative grid size-11 shrink-0 place-items-center rounded-full"
-        aria-label={label ? `Уведомления, ${label} новых` : "Уведомления"}
+        aria-label={count > 0 ? `Уведомления, ${ruUnreadLabel(count)}` : "Уведомления"}
       >
         <Bell className="size-5" />
         {label ? (
@@ -109,7 +113,7 @@ export function ActivityBell() {
 export function ActivityFloat() {
   const tab = useCouple((s) => s.tab);
   const moreOpen = useCouple((s) => s.moreOpen);
-  if (tab !== "more" || !moreOpen || moreOpen === "chat" || moreOpen === "games") return null;
+  if (tab !== "more" || !moreOpen || moreOpen === "chat" || moreOpen === "games" || moreOpen === "vote") return null;
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-40">
       <div className="app-frame safe-pad flex justify-end pr-1">
