@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ActivityFloat } from "@/components/activity-bell";
 import { DatePicker } from "@/components/date-picker";
 import { PairCode } from "@/components/pair-code";
 import { LoginNotice } from "@/components/login-notice";
@@ -26,6 +27,8 @@ import {
 import {
   markTaskSynced,
   markWishSynced,
+  refreshPairTasks,
+  refreshPairWishes,
   resetSyncMarks,
   taskNeedsUpload,
   taskSyncKey,
@@ -36,6 +39,9 @@ import { getMyPair, joinByInvite, saveMyProfile, saveTogetherSince, type PairPro
 import { savePairTask } from "@/lib/pair-tasks";
 import { packWish, savePairWish } from "@/lib/pair-wishes";
 import { refreshCoupleQuiz } from "@/lib/quiz-live";
+import { activityResultIsStale, activityStamp } from "@/lib/activity-gate";
+import { ACTIVITY_POLL_MS, visibleSection, withoutSection } from "@/lib/activity-model";
+import { getPairActivity, markActivitySection } from "@/lib/activity-server";
 import { CHAT_BADGE_POLL_MS } from "@/lib/chat-model";
 import { getChatBadge } from "@/lib/chat-server";
 import { PAIR_POLL_MS, PAIR_WAIT_POLL_MS, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
@@ -235,15 +241,49 @@ function InviteScreen({
   );
 }
 
+function ActivitySync() {
+  const joined = useCouple((s) => s.joined);
+  const tab = useCouple((s) => s.tab);
+  const moreOpen = useCouple((s) => s.moreOpen);
+  const section = visibleSection(tab, moreOpen);
+
+  useEffect(() => {
+    if (!joined || !section || section === "chat") return;
+    useCouple.getState().forgetActivitySection(section);
+    void markActivitySection({ data: { section } }).catch(() => undefined);
+  }, [joined, section]);
+
+  useScreenPoll("activity", joined, ACTIVITY_POLL_MS, async () => {
+    const started = activityStamp();
+    const snap = await getPairActivity();
+    if (activityResultIsStale(started)) return;
+    const state = useCouple.getState();
+    const open = visibleSection(state.tab, state.moreOpen);
+    const next = open ? withoutSection(snap, open) : snap;
+    if (activityResultIsStale(started)) return;
+    if (open && open !== "chat" && snap.counts[open] > 0) {
+      void markActivitySection({ data: { section: open } }).catch(() => undefined);
+    }
+    if (state.moreOpen !== "chat") state.setChatUnread(next.counts.chat);
+    state.setActivity(next);
+  });
+  return null;
+}
+
 function ChatBadgePoll() {
   const chatOpen = useCouple((s) => s.moreOpen === "chat");
   useScreenPoll("chat-badge", !chatOpen, CHAT_BADGE_POLL_MS, async () => {
+    const started = activityStamp();
     const badge = await getChatBadge();
+    if (activityResultIsStale(started)) return;
     if (useCouple.getState().moreOpen === "chat") return;
     useCouple.getState().setChatUnread(badge.unread);
   });
   return null;
 }
+
+const taskUpload = new Set<string>();
+const wishUpload = new Set<string>();
 
 function AppShell() {
   const tab = useCouple((s) => s.tab);
@@ -256,20 +296,31 @@ function AppShell() {
     if (!myUserId || localOwnerId !== myUserId) return;
     let stop = false;
     const run = async () => {
-      for (const task of tasks) {
+      const ready = await refreshPairTasks().catch(() => false);
+      if (stop || !ready) return;
+      const state = useCouple.getState();
+      if (!state.myUserId || state.localOwnerId !== state.myUserId) return;
+      for (const task of state.tasks) {
+        if (stop) return;
         const withOwner = {
           ...task,
           ownerUserId:
             task.ownerUserId ??
-            (task.owner === "both" ? "both" : task.owner === "me" ? myUserId : task.owner === "partner" ? partnerUserId : null),
+            (task.owner === "both" ? "both" : task.owner === "me" ? state.myUserId : task.owner === "partner" ? state.partnerUserId : null),
         };
         const key = taskSyncKey(withOwner);
-        if (!taskNeedsUpload(task.id, key)) continue;
-        markTaskSynced(task.id, key);
-        const saved = await savePairTask({ data: withOwner }).catch(() => null);
-        if (stop || !saved?.updatedAt || saved.updatedAt === key) continue;
-        markTaskSynced(task.id, saved.updatedAt);
-        useCouple.getState().replaceTaskMeta(task.id, { updatedAt: saved.updatedAt });
+        if (!taskNeedsUpload(task.id, key) || taskUpload.has(task.id)) continue;
+        taskUpload.add(task.id);
+        try {
+          const saved = await savePairTask({ data: withOwner }).catch(() => null);
+          if (!saved) continue;
+          const savedKey = taskSyncKey(saved);
+          markTaskSynced(task.id, savedKey);
+          if (stop || savedKey === key) continue;
+          useCouple.getState().replaceTaskMeta(task.id, { updatedAt: saved.updatedAt });
+        } finally {
+          taskUpload.delete(task.id);
+        }
       }
     };
     void run();
@@ -282,27 +333,35 @@ function AppShell() {
     if (!myUserId || localOwnerId !== myUserId) return;
     let stop = false;
     const run = async () => {
-      for (const wish of wishes) {
+      const ready = await refreshPairWishes().catch(() => false);
+      if (stop || !ready) return;
+      const state = useCouple.getState();
+      if (!state.myUserId || state.localOwnerId !== state.myUserId) return;
+      for (const wish of state.wishes) {
         if (stop) return;
         const withOwner = {
           ...wish,
-          ownerUserId: wish.ownerUserId ?? (wish.owner === "me" ? myUserId : partnerUserId),
+          ownerUserId: wish.ownerUserId ?? (wish.owner === "me" ? state.myUserId : state.partnerUserId),
         };
         const photo = withOwner.photo.startsWith("data:") ? await compressPhotoData(withOwner.photo) : withOwner.photo;
         const packed = packWish({ ...withOwner, photo });
         const key = wishSyncKey(packed);
-        if (!wishNeedsUpload(wish.id, key)) continue;
-        markWishSynced(wish.id, key);
-        const saved = await savePairWish({ data: packed }).catch(() => null);
-        if (stop || !saved) continue;
-        const savedKey = wishSyncKey(saved);
-        if (savedKey === key) continue;
-        markWishSynced(wish.id, savedKey);
-        useCouple.getState().replaceWishMeta(wish.id, {
-          photo: saved.photo,
-          photoPath: saved.photoPath,
-          updatedAt: saved.updatedAt,
-        });
+        if (!wishNeedsUpload(wish.id, key) || wishUpload.has(wish.id)) continue;
+        wishUpload.add(wish.id);
+        try {
+          const saved = await savePairWish({ data: packed }).catch(() => null);
+          if (!saved) continue;
+          const savedKey = wishSyncKey(saved);
+          markWishSynced(wish.id, savedKey);
+          if (stop || savedKey === key) continue;
+          useCouple.getState().replaceWishMeta(wish.id, {
+            photo: saved.photo,
+            photoPath: saved.photoPath,
+            updatedAt: saved.updatedAt,
+          });
+        } finally {
+          wishUpload.delete(wish.id);
+        }
       }
     };
     void run();
@@ -327,6 +386,8 @@ function AppShell() {
       {tab === "wishes" ? <WishesScreen /> : null}
       {tab === "lists" ? <ListsScreen /> : null}
       {tab === "more" ? <MoreScreen /> : null}
+      <ActivityFloat />
+      <ActivitySync />
       <ChatBadgePoll />
       <TabBar />
     </main>

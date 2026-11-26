@@ -207,6 +207,7 @@ export const leavePairRemote = createServerFn({ method: "POST" })
       if (wish.photo_path?.startsWith(`${pairId}/`)) await removeWishPhoto(wish.photo_path);
     }
     await deleteCoupleGames(pairId);
+    await sbDelete("app_activity_reads", eqFilter("pair_id", pairId)).catch(() => undefined);
     await sbDelete("app_daily_answers", eqFilter("pair_id", pairId));
     await sbDelete("app_daily_open", eqFilter("pair_id", pairId));
     await sbDelete("app_pairs", eqFilter("id", pairId));

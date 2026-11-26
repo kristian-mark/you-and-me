@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { prepareAlbumUpload } from "@/lib/album-image";
+import { ActivityBell } from "@/components/activity-bell";
 import { SheetHeader } from "@/components/sheet-header";
 import { getAlbumHome, type AlbumPhoto } from "@/lib/album-server";
 import { uploadChatImage, uploadChatVoice } from "@/lib/chat-image";
@@ -393,18 +394,18 @@ export function ChatScreen({ onBack }: { onBack: () => void }) {
       className="app-frame safe-pad fixed left-1/2 z-30 flex w-full -translate-x-1/2 flex-col bg-bg"
       style={{ top: keyboard.offset, bottom: keyboard.inset }}
     >
-      <header className="flex min-h-14 items-center gap-2 px-3 pt-2">
-        <button type="button" onClick={onBack} className="min-h-11 shrink-0 px-1 text-[17px] text-muted" aria-label="Ещё">
+      <header className="grid min-h-14 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1 px-2 pt-2">
+        <button type="button" onClick={onBack} className="grid size-11 place-items-center text-[17px] text-muted" aria-label="Ещё">
           ‹
         </button>
-        <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
+        <div className="flex min-w-0 items-center justify-center gap-2">
           <span className="relative h-5 w-8 shrink-0" aria-hidden="true">
             <span className={`absolute top-0.5 left-0 size-4 rounded-full ${pieceBg(colors.me)}`} />
             <span className={`absolute top-0.5 right-0 size-4 rounded-full ${pieceBg(colors.partner)}`} />
           </span>
           <h1 className="truncate text-[17px] font-semibold">{partnerName}</h1>
         </div>
-        <span className="w-7 shrink-0" />
+        <ActivityBell />
       </header>
 
       {banner ? (

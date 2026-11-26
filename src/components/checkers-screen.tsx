@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { CircleHelp, Crown, Flag, MousePointerClick, OctagonAlert, Undo2, X } from "lucide-react";
+import { Crown, Flag, MousePointerClick, OctagonAlert, Undo2, X } from "lucide-react";
+import { GameTools } from "@/components/activity-bell";
 import { useCouple, usePlayerColors } from "@/lib/couple-store";
 import { pieceBg, type PieceColor } from "@/lib/pair-color";
 import { GAME_POLL_MS, pollFailureNotice, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
@@ -200,9 +201,7 @@ export function CheckersMatch({ onBack }: { onBack: () => void; onAgain?: () => 
             ‹ Игры
           </button>
           <span className="sr-only">Шашки</span>
-          <button type="button" onClick={() => setHelp(true)} className="grid size-11 place-items-center justify-self-end text-[#e6e1d6]" aria-label="Правила">
-            <CircleHelp className="size-5" />
-          </button>
+          <GameTools onHelp={() => setHelp(true)} />
         </header>
 
         {!view ? (

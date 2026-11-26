@@ -46,7 +46,7 @@ function signature(rows: SyncRow[]) {
 export async function refreshPairTasks() {
   const rows = await listPairTasks();
   const state = useCouple.getState();
-  if (!state.joined || !state.myUserId || state.localOwnerId !== state.myUserId) return;
+  if (!state.joined || !state.myUserId || state.localOwnerId !== state.myUserId) return false;
   const plan = planRemoteSync(
     state.tasks.filter((task) => !task.deleted),
     rows,
@@ -55,12 +55,13 @@ export async function refreshPairTasks() {
   for (const task of plan.mark) markTaskSynced(task.id, taskSyncKey(task));
   if (plan.forget.length) state.rememberDeletes(plan.forget, []);
   if (signature(state.tasks) !== signature(plan.next)) state.replaceTasks(plan.next);
+  return true;
 }
 
 export async function refreshPairWishes() {
   const rows = await listPairWishes();
   const state = useCouple.getState();
-  if (!state.joined || !state.myUserId || state.localOwnerId !== state.myUserId) return;
+  if (!state.joined || !state.myUserId || state.localOwnerId !== state.myUserId) return false;
   const plan = planRemoteSync(
     state.wishes.filter((wish) => !wish.deleted),
     rows,
@@ -69,4 +70,5 @@ export async function refreshPairWishes() {
   for (const wish of plan.mark) markWishSynced(wish.id, wishSyncKey(wish));
   if (plan.forget.length) state.rememberDeletes([], plan.forget);
   if (signature(state.wishes) !== signature(plan.next)) state.replaceWishes(plan.next);
+  return true;
 }

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
+import { taskActivityAction, taskContentSame } from "@/lib/activity-model";
 import type { Task } from "@/lib/couple-store";
 import { myPairId, stillInPair } from "@/lib/pair-access";
 import { assertSafeId, eqFilter, sbDelete, sbInsert, sbPatch, sbSelect } from "@/lib/supabase-app";
@@ -55,11 +56,17 @@ async function rowById(id: string) {
   return rows[0] ?? null;
 }
 
-function taskBody(pairId: string, task: Task, deleted: boolean) {
+function taskBody(
+  task: Task,
+  deleted: boolean,
+  userId: string,
+  previous: { done: boolean; deleted: boolean } | null,
+) {
+  const next = { done: deleted ? true : task.done, deleted };
   return {
     owner_user_id: task.ownerUserId ?? null,
     title: task.title || "Задача",
-    done: deleted ? true : task.done,
+    done: next.done,
     payload: {
       owner: task.owner,
       subtasks: task.subtasks ?? [],
@@ -71,6 +78,8 @@ function taskBody(pairId: string, task: Task, deleted: boolean) {
       claimedAt: task.claimedAt ?? null,
       createdBy: task.createdBy ?? null,
       deleted,
+      updatedBy: userId,
+      activityAction: taskActivityAction(previous, next),
     },
     updated_at: new Date().toISOString(),
   };
@@ -80,7 +89,13 @@ async function writeTask(userId: string, pairId: string, task: Task, deleted: bo
   const id = assertSafeId(task.id);
   const existing = await rowById(id);
   if (existing && existing.pair_id !== pairId) throw new Error("Чужая задача");
-  const body = taskBody(pairId, { ...task, id }, deleted);
+  const previous = existing
+    ? { done: existing.done, deleted: Boolean(payloadOf(existing).deleted) }
+    : null;
+  if (existing && taskContentSame(parseTask(existing), { ...task, id, deleted })) {
+    return parseTask(existing);
+  }
+  const body = taskBody({ ...task, id }, deleted, userId, previous);
   if (!existing) {
     try {
       await sbInsert("app_tasks", { id, pair_id: pairId, ...body });

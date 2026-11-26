@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { CircleHelp, Flag, LayoutGrid, Square, Trophy, X } from "lucide-react";
+import { Flag, LayoutGrid, Square, Trophy, X } from "lucide-react";
+import { GameTools } from "@/components/activity-bell";
 import { useCouple, usePlayerColors } from "@/lib/couple-store";
 import { pieceBg, type PieceColor } from "@/lib/pair-color";
 import { GAME_POLL_MS, pollFailureNotice, refreshScreen, useScreenPoll } from "@/lib/screen-poll";
@@ -265,9 +266,7 @@ export function DotsMatch({ onBack }: { onBack: () => void; onAgain?: () => void
             ‹ Игры
           </button>
           <span className="sr-only">Точки и квадраты</span>
-          <button type="button" onClick={() => setHelp(true)} className="grid size-11 place-items-center justify-self-end text-[#e6e1d6]" aria-label="Правила">
-            <CircleHelp className="size-5" />
-          </button>
+          <GameTools onHelp={() => setHelp(true)} />
         </header>
 
         {!view ? (

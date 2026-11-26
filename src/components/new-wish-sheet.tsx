@@ -3,7 +3,6 @@ import { Check, ChevronLeft, Search } from "lucide-react";
 import { SheetHeader } from "@/components/sheet-header";
 import { compressPhotoFile } from "@/lib/compress-photo";
 import { useCouple, viewedWishOwner, type Wish, type WishPriority } from "@/lib/couple-store";
-import { packWish, savePairWish } from "@/lib/pair-wishes";
 
 const POPULAR = [
   { code: "RUB", name: "Российский рубль", symbol: "₽" },
@@ -96,9 +95,6 @@ export function NewWishSheet({ wish, onClose }: { wish?: Wish; onClose: () => vo
     };
     if (wish) updateWish(wish.id, payload);
     else addWish(payload);
-    const latest = useCouple.getState().wishes[0];
-    const stored = wish ? useCouple.getState().wishes.find((w) => w.id === wish.id) : latest;
-    if (stored) void savePairWish({ data: packWish(stored) }).catch(() => undefined);
     onClose();
   };
 

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
+import { wishActivityAction, wishContentSame } from "@/lib/activity-model";
 import type { Wish } from "@/lib/couple-store";
 import { myPairId, stillInPair } from "@/lib/pair-access";
 import {
@@ -117,7 +118,13 @@ export const savePairWish = createServerFn({ method: "POST" })
     const id = assertSafeId(wish.id);
     const existing = await rowById(id);
     if (existing && existing.pair_id !== pairId) throw new Error("Чужая хотелка");
+    if (existing && wishContentSame(parseWish(existing), { ...wish, id })) {
+      return parseWish(existing);
+    }
     const photo = await photoForSave(pairId, { ...wish, id });
+    const previous = existing
+      ? { fulfilled: existing.fulfilled, deleted: Boolean(payloadOf(existing).deleted) }
+      : null;
     const body: Record<string, unknown> = {
       owner_user_id: wish.ownerUserId ?? null,
       title: wish.title || "Хотелка",
@@ -133,6 +140,8 @@ export const savePairWish = createServerFn({ method: "POST" })
         createdAt: wish.createdAt,
         fulfilledAt: wish.fulfilledAt ?? null,
         deleted: false,
+        updatedBy: context.userId,
+        activityAction: wishActivityAction(previous, { fulfilled: wish.fulfilled, deleted: false }),
       },
       updated_at: new Date().toISOString(),
     };
@@ -169,7 +178,13 @@ export const deletePairWish = createServerFn({ method: "POST" })
     if (existing.pair_id !== pairId) throw new Error("Чужая хотелка");
     const current = parseWish(existing);
     await sbPatch("app_wishes", `${eqFilter("id", id)}&${eqFilter("pair_id", pairId)}`, {
-      payload: { ...payloadOf(existing), deleted: true, photo: "" },
+      payload: {
+        ...payloadOf(existing),
+        deleted: true,
+        photo: "",
+        updatedBy: context.userId,
+        activityAction: "deleted",
+      },
       photo_path: null,
       updated_at: new Date().toISOString(),
     });

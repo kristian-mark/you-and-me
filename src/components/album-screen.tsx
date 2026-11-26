@@ -297,7 +297,7 @@ export function AlbumScreen({ onBack }: { onBack: () => void }) {
               setMenu((open) => !open);
               setRename(album.title);
             }}
-            className="absolute top-4 right-4 grid size-10 place-items-center rounded-full bg-black/45"
+            className="absolute top-4 right-14 grid size-10 place-items-center rounded-full bg-black/45"
             aria-label="Ещё"
           >
             <MoreHorizontal className="size-5" />
